@@ -1,13 +1,631 @@
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===== BASE STYLES ===== */
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+      'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+      sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    @apply bg-gray-50 text-gray-900;
+  }
+
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+      monospace;
+  }
+
+  h1 {
+    @apply text-3xl font-bold text-gray-900;
+  }
+
+  h2 {
+    @apply text-2xl font-bold text-gray-900;
+  }
+
+  h3 {
+    @apply text-xl font-semibold text-gray-900;
+  }
+
+  /* Scrollbar stilleri */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100 rounded;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-400 rounded hover:bg-gray-500 transition-colors;
+  }
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+/* ===== COMPONENT STYLES ===== */
+@layer components {
+
+  /* Butonlar */
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+
+  .btn-primary {
+    @apply btn bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500;
+  }
+
+  .btn-success {
+    @apply btn bg-green-600 text-white hover:bg-green-700 focus:ring-green-500;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+
+  .btn-warning {
+    @apply btn bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-500;
+  }
+
+  .btn-outline {
+    @apply btn border-2 border-gray-300 text-gray-700 hover:bg-gray-50 focus:ring-gray-500;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-sm;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-lg;
+  }
+
+  /* Kartlar */
+  .card {
+    @apply bg-white rounded-xl shadow-md hover:shadow-lg transition-shadow duration-300 overflow-hidden;
+  }
+
+  .card-header {
+    @apply px-6 py-4 border-b border-gray-200 bg-gray-50;
+  }
+
+  .card-body {
+    @apply p-6;
+  }
+
+  .card-footer {
+    @apply px-6 py-4 border-t border-gray-200 bg-gray-50;
+  }
+
+  /* Form elemanları */
+  .form-group {
+    @apply mb-4;
+  }
+
+  .form-label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+
+  .form-input {
+    @apply mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors duration-200;
+  }
+
+  .form-select {
+    @apply mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200;
+  }
+
+  .form-textarea {
+    @apply mt-1 block w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors duration-200;
+  }
+
+  .form-error {
+    @apply mt-1 text-sm text-red-600;
+  }
+
+  .form-hint {
+    @apply mt-1 text-sm text-gray-500;
+  }
+
+  /* Tablolar */
+  .table-container {
+    @apply bg-white rounded-xl shadow overflow-hidden;
+  }
+
+  .table {
+    @apply min-w-full divide-y divide-gray-200;
+  }
+
+  .table thead {
+    @apply bg-gray-50;
+  }
+
+  .table th {
+    @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+  }
+
+  .table td {
+    @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+  }
+
+  .table tbody tr {
+    @apply hover:bg-gray-50 transition-colors duration-150;
+  }
+
+  .table-striped tbody tr:nth-child(even) {
+    @apply bg-gray-50;
+  }
+
+  .table-bordered {
+    @apply border border-gray-200;
+  }
+
+  .table-bordered th,
+  .table-bordered td {
+    @apply border border-gray-200;
+  }
+
+  /* Badge'ler */
+  .badge {
+    @apply px-2.5 py-0.5 text-xs font-medium rounded-full;
+  }
+
+  .badge-sm {
+    @apply px-2 py-0.5 text-xs;
+  }
+
+  .badge-lg {
+    @apply px-3 py-1 text-sm;
+  }
+
+  .badge-blue {
+    @apply bg-blue-100 text-blue-800;
+  }
+
+  .badge-green {
+    @apply bg-green-100 text-green-800;
+  }
+
+  .badge-red {
+    @apply bg-red-100 text-red-800;
+  }
+
+  .badge-yellow {
+    @apply bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-purple {
+    @apply bg-purple-100 text-purple-800;
+  }
+
+  .badge-pink {
+    @apply bg-pink-100 text-pink-800;
+  }
+
+  .badge-indigo {
+    @apply bg-indigo-100 text-indigo-800;
+  }
+
+  .badge-gray {
+    @apply bg-gray-100 text-gray-800;
+  }
+
+  /* İstasyon badge'leri */
+  .badge-planlama {
+    @apply badge bg-yellow-100 text-yellow-800;
+  }
+
+  .badge-cnc {
+    @apply badge bg-blue-100 text-blue-800;
+  }
+
+  .badge-tutkal {
+    @apply badge bg-purple-100 text-purple-800;
+  }
+
+  .badge-pvc {
+    @apply badge bg-indigo-100 text-indigo-800;
+  }
+
+  .badge-pres {
+    @apply badge bg-orange-100 text-orange-800;
+  }
+
+  .badge-kenarbant {
+    @apply badge bg-pink-100 text-pink-800;
+  }
+
+  .badge-kilit {
+    @apply badge bg-gray-100 text-gray-800;
+  }
+
+  .badge-lake {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  .badge-paketleme {
+    @apply badge bg-teal-100 text-teal-800;
+  }
+
+  .badge-tamamlandi {
+    @apply badge bg-emerald-100 text-emerald-800;
+  }
+
+  .badge-kritik {
+    @apply badge bg-red-100 text-red-800;
+  }
+
+  .badge-normal {
+    @apply badge bg-green-100 text-green-800;
+  }
+
+  /* Alert'ler */
+  .alert {
+    @apply p-4 rounded-lg mb-4;
+  }
+
+  .alert-success {
+    @apply alert bg-green-50 text-green-800 border border-green-200;
+  }
+
+  .alert-error {
+    @apply alert bg-red-50 text-red-800 border border-red-200;
+  }
+
+  .alert-warning {
+    @apply alert bg-yellow-50 text-yellow-800 border border-yellow-200;
+  }
+
+  .alert-info {
+    @apply alert bg-blue-50 text-blue-800 border border-blue-200;
+  }
+
+  /* Modal */
+  .modal-overlay {
+    @apply fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center;
+  }
+
+  .modal-container {
+    @apply relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-xl bg-white transform transition-all duration-300 scale-100;
+  }
+
+  .modal-header {
+    @apply flex justify-between items-center pb-3 border-b border-gray-200;
+  }
+
+  .modal-body {
+    @apply mt-4;
+  }
+
+  .modal-footer {
+    @apply flex justify-end space-x-3 mt-6 pt-3 border-t border-gray-200;
+  }
+
+  /* Loading spinner */
+  .spinner {
+    @apply animate-spin rounded-full border-4 border-gray-200 border-t-blue-600 h-8 w-8;
+  }
+
+  .spinner-sm {
+    @apply h-4 w-4 border-2;
+  }
+
+  .spinner-lg {
+    @apply h-12 w-12 border-4;
+  }
+
+  /* İstasyon kartları */
+  .station-card {
+    @apply card hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1;
+  }
+
+  .station-card-header {
+    @apply flex justify-between items-start mb-4;
+  }
+
+  .station-card-title {
+    @apply text-lg font-medium text-gray-900;
+  }
+
+  .station-card-badge {
+    @apply px-2 py-1 text-xs font-semibold rounded-full;
+  }
+
+  /* Dashboard grid */
+  .dashboard-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6;
+  }
+
+  /* İstatistik kartları */
+  .stat-card {
+    @apply card bg-gradient-to-br from-blue-500 to-blue-600 text-white;
+  }
+
+  .stat-card-title {
+    @apply text-sm font-medium opacity-90;
+  }
+
+  .stat-card-value {
+    @apply text-3xl font-bold mt-2;
+  }
+
+  .stat-card-icon {
+    @apply absolute top-4 right-4 text-4xl opacity-30;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    @apply w-full bg-gray-200 rounded-full h-2.5;
+  }
+
+  .progress-bar-fill {
+    @apply bg-blue-600 h-2.5 rounded-full transition-all duration-300;
+  }
+
+  /* Tabs */
+  .tabs {
+    @apply border-b border-gray-200;
+  }
+
+  .tab {
+    @apply inline-block p-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:border-gray-300 border-b-2 border-transparent transition-all duration-200 cursor-pointer;
+  }
+
+  .tab-active {
+    @apply text-blue-600 border-blue-600;
+  }
+
+  /* Pagination */
+  .pagination {
+    @apply flex items-center justify-center space-x-2 mt-6;
+  }
+
+  .page-item {
+    @apply px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 transition-colors duration-200;
+  }
+
+  .page-item-active {
+    @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700;
+  }
+
+  .page-item-disabled {
+    @apply opacity-50 cursor-not-allowed hover:bg-white;
+  }
+
+  /* Breadcrumb */
+  .breadcrumb {
+    @apply flex items-center space-x-2 text-sm text-gray-500 mb-4;
+  }
+
+  .breadcrumb-item {
+    @apply hover:text-gray-700 transition-colors duration-200;
+  }
+
+  .breadcrumb-item-active {
+    @apply text-gray-900 font-medium;
+  }
+
+  /* Tooltip */
+  .tooltip {
+    @apply absolute z-50 px-2 py-1 text-xs font-medium text-white bg-gray-900 rounded shadow-lg whitespace-nowrap;
+  }
+
+  /* Avatar */
+  .avatar {
+    @apply rounded-full object-cover;
+  }
+
+  .avatar-sm {
+    @apply h-8 w-8;
+  }
+
+  .avatar-md {
+    @apply h-10 w-10;
+  }
+
+  .avatar-lg {
+    @apply h-12 w-12;
+  }
+
+  /* Dropdown */
+  .dropdown {
+    @apply absolute z-50 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5;
+  }
+
+  .dropdown-item {
+    @apply block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors duration-200 cursor-pointer;
+  }
+
+  /* Navbar */
+  .navbar {
+    @apply bg-white shadow-md;
+  }
+
+  .navbar-container {
+    @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  .navbar-content {
+    @apply flex justify-between items-center h-16;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    @apply bg-white shadow-lg h-screen fixed left-0 top-0 w-64 transform transition-transform duration-300;
+  }
+
+  .sidebar-item {
+    @apply flex items-center px-6 py-3 text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors duration-200;
+  }
+
+  .sidebar-item-active {
+    @apply bg-blue-50 text-blue-600 border-l-4 border-blue-600;
+  }
+
+  /* Responsive utilities */
+  @media (max-width: 640px) {
+    .mobile-stack {
+      @apply flex-col;
+    }
+
+    .mobile-full-width {
+      @apply w-full;
+    }
+
+    .mobile-hide {
+      @apply hidden;
+    }
+
+    .mobile-show {
+      @apply block;
+    }
+
+    .mobile-text-center {
+      @apply text-center;
+    }
+  }
+
+  @media (min-width: 641px) and (max-width: 1024px) {
+    .tablet-grid-2 {
+      @apply grid grid-cols-2 gap-4;
+    }
+  }
+}
+
+/* ===== ANIMATIONS ===== */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-bounce-slow {
+    animation: bounce 2s infinite;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes slideIn {
+    from {
+      transform: translateX(100%);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes pulse {
+
+    0%,
+    100% {
+      opacity: 1;
+    }
+
+    50% {
+      opacity: .5;
+    }
+  }
+
+  @keyframes bounce {
+
+    0%,
+    100% {
+      transform: translateY(-5%);
+      animation-timing-function: cubic-bezier(0.8, 0, 1, 1);
+    }
+
+    50% {
+      transform: translateY(0);
+      animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+    }
+  }
+}
+
+/* ===== PRINT STYLES ===== */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  body {
+    @apply bg-white;
+  }
+
+  .card {
+    @apply shadow-none border;
+  }
+}
+
+/* ===== DARK MODE (İsteğe bağlı) ===== */
+@media (prefers-color-scheme: dark) {
+  .dark-mode {
+    @apply bg-gray-900 text-gray-100;
+  }
+
+  .dark-mode .card {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  .dark-mode .table thead {
+    @apply bg-gray-800;
+  }
+
+  .dark-mode .table td {
+    @apply text-gray-300;
+  }
 }

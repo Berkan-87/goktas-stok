@@ -3,7 +3,6 @@ const router = express.Router();
 const User = require('../models/User');
 const { checkPermission } = require('../middleware/auth');
 
-// Tüm kullanıcıları getir - Sadece admin
 router.get('/', checkPermission(['admin']), async (req, res) => {
   try {
     const users = await User.find().select('-password');
@@ -13,7 +12,6 @@ router.get('/', checkPermission(['admin']), async (req, res) => {
   }
 });
 
-// Kullanıcı sil - Sadece admin
 router.delete('/:id', checkPermission(['admin']), async (req, res) => {
   try {
     const user = await User.findByIdAndDelete(req.params.id);

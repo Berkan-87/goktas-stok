@@ -27,14 +27,30 @@ const userSchema = new mongoose.Schema({
   }
 });
 
+// Şifreyi hash'leme (kaydetmeden önce) - DÜZELTİLMİŞ VERSİYON
 userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
+  try {
+    // Şifre değişmemişse devam et
+    if (!this.isModified('password')) {
+      return next();
+    }
+    
+    // Şifreyi hashle
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
+// Şifre karşılaştırma metodu
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw error;
+  }
 };
 
 module.exports = mongoose.model('User', userSchema);
