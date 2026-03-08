@@ -1,8 +1,14 @@
+# Jekyll Yapılandırması
+title: Göktaş Kapı Yönetim Paneli
+description: Üretim ve Stok Takip Sistemi
+
+# Gereksiz dosyaların build edilmesini engelle
 exclude:
-  - node_modules
-  - vendor
-  - .bundle
-  - .sass-cache
+  - node_modules/
+  - backend/node_modules/
+  - vendor/
+  - .bundle/
+  - .sass-cache/
   - Gemfile
   - Gemfile.lock
-  - goktas-kapi/backend/node_modules # Backend içindeki bağımlılıkları da dışla
+  - '**/node_modules/**'
