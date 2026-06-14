@@ -87,9 +87,12 @@ const Login = () => {
           </div>
 
           <div className="text-center text-sm text-gray-500">
-            <p>Demo hesaplar:</p>
+            <p>GÖKTAŞ DEPOYA HOŞGELDİNİZ!</p>
+            <p>HESABINIZ YOKSA YÖNETİCİNİZLE İLETİŞİME GEÇİNİZ.</p>
+
+            {/* <p>Demo hesaplar:</p>
             <p>Admin: admin / admin123</p>
-            <p>Fabrika Yöneticisi: fabrika / 123456</p>
+            <p>Fabrika Yöneticisi: fabrika / 123456</p> */}
           </div>
         </form>
       </div>

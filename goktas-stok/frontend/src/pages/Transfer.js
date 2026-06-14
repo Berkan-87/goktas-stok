@@ -16,6 +16,7 @@ const Transfer = () => {
     note: ''
   });
   const [availableStock, setAvailableStock] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const branches = [
     { value: 'fabrika', label: '🏭 Fabrika' },
@@ -30,11 +31,14 @@ const Transfer = () => {
   }, []);
 
   useEffect(() => {
+    // Ürün ve kaynak şube seçildiğinde stoğu kontrol et
     if (formData.productId && formData.fromBranch) {
       const stock = stocks.find(
-        s => s.productId._id === formData.productId && s.branch === formData.fromBranch
+        s => s.productId?._id === formData.productId && s.branch === formData.fromBranch
       );
       setAvailableStock(stock ? stock.quantity : 0);
+    } else {
+      setAvailableStock(0);
     }
   }, [formData.productId, formData.fromBranch, stocks]);
 
@@ -70,14 +74,39 @@ const Transfer = () => {
       return;
     }
 
-    if (formData.quantity > availableStock) {
-      toast.error(`Yeterli stok yok. Mevcut stok: ${availableStock}`);
+    const quantityNum = parseInt(formData.quantity);
+    if (isNaN(quantityNum) || quantityNum <= 0) {
+      toast.error('Geçerli bir miktar giriniz');
       return;
     }
 
+    if (quantityNum > availableStock) {
+      toast.error(`Yeterli stok yok. Mevcut stok: ${availableStock} adet`);
+      return;
+    }
+
+    setLoading(true);
     try {
-      await axios.post('/transfer', formData);
-      toast.success('Transfer başarıyla tamamlandı');
+      // Backend'de transfer endpoint'i yoksa, önce çıkış sonra giriş yapalım
+      // 1. Kaynak şubeden stok çıkışı
+      await axios.post('/stock/out', {
+        productId: formData.productId,
+        branch: formData.fromBranch,
+        quantity: quantityNum,
+        note: `${formData.note || 'Transfer'} - ${formData.fromBranch} → ${formData.toBranch}`
+      });
+
+      // 2. Hedef şubeye stok girişi
+      await axios.post('/stock/in', {
+        productId: formData.productId,
+        branch: formData.toBranch,
+        quantity: quantityNum,
+        note: `${formData.note || 'Transfer'} - ${formData.fromBranch} → ${formData.toBranch}`
+      });
+
+      toast.success(`${quantityNum} adet ürün başarıyla transfer edildi`);
+      
+      // Formu temizle
       setFormData({
         productId: '',
         fromBranch: user?.branch || '',
@@ -85,15 +114,29 @@ const Transfer = () => {
         quantity: '',
         note: ''
       });
-      fetchData();
+      
+      // Verileri yenile
+      await fetchData();
+      
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Transfer başarısız');
+      console.error('Transfer hatası:', error);
+      toast.error(error.response?.data?.message || 'Transfer başarısız oldu');
+    } finally {
+      setLoading(false);
     }
   };
 
   const getProductName = (productId) => {
     const product = products.find(p => p._id === productId);
     return product ? `${product.code} - ${product.name}` : '';
+  };
+
+  // Maksimum transfer edilebilecek miktarı göster
+  const getMaxTransfer = () => {
+    if (availableStock > 0) {
+      return availableStock;
+    }
+    return 0;
   };
 
   return (
@@ -107,11 +150,11 @@ const Transfer = () => {
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Ürün / Model
+              Ürün / Model <span className="text-red-500">*</span>
             </label>
             <select
               value={formData.productId}
-              onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, productId: e.target.value, quantity: '' })}
               className="input-field"
               required
             >
@@ -127,31 +170,43 @@ const Transfer = () => {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Kaynak Şube
+                Kaynak Şube <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.fromBranch}
-                onChange={(e) => setFormData({ ...formData, fromBranch: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, fromBranch: e.target.value, quantity: '' })}
                 className="input-field"
                 required
                 disabled={user?.role === 'branch_manager'}
               >
+                <option value="">Kaynak şube seçin</option>
                 {branches.map(branch => (
                   <option key={branch.value} value={branch.value}>
                     {branch.label}
                   </option>
                 ))}
               </select>
-              {formData.fromBranch && availableStock > 0 && (
-                <p className="text-sm text-gray-500 mt-1">
-                  Mevcut stok: {availableStock} adet
-                </p>
+              {formData.fromBranch && (
+                <div className="mt-2 p-2 rounded-lg text-sm">
+                  {availableStock > 0 ? (
+                    <p className="text-green-600">
+                      ✓ Mevcut stok: <strong>{availableStock}</strong> adet
+                      {availableStock <= 10 && availableStock > 0 && (
+                        <span className="text-yellow-600 ml-2">(Kritik seviye!)</span>
+                      )}
+                    </p>
+                  ) : (
+                    <p className="text-red-600">
+                      ✗ Bu şubede stok bulunmamaktadır
+                    </p>
+                  )}
+                </div>
               )}
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Hedef Şube
+                Hedef Şube <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.toBranch}
@@ -173,18 +228,31 @@ const Transfer = () => {
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Transfer Miktarı
+              Transfer Miktarı <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
               value={formData.quantity}
-              onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+              onChange={(e) => {
+                const value = parseInt(e.target.value);
+                if (value <= availableStock || !e.target.value) {
+                  setFormData({ ...formData, quantity: e.target.value });
+                } else {
+                  toast.error(`Maksimum ${availableStock} adet transfer edebilirsiniz`);
+                }
+              }}
               className="input-field"
-              placeholder="Miktar"
+              placeholder="Miktar girin"
               min="1"
-              max={availableStock}
+              max={availableStock || undefined}
               required
+              disabled={availableStock === 0}
             />
+            {availableStock > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                Maksimum transfer: {getMaxTransfer()} adet
+              </p>
+            )}
           </div>
 
           <div>
@@ -200,27 +268,49 @@ const Transfer = () => {
             />
           </div>
 
-          {formData.productId && formData.fromBranch && formData.toBranch && formData.quantity && (
-            <div className="bg-blue-50 p-4 rounded-lg">
+          {formData.productId && formData.fromBranch && formData.toBranch && formData.quantity && availableStock > 0 && (
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <p className="text-sm font-semibold text-blue-900 mb-2">Transfer Özeti:</p>
               <p className="text-sm text-blue-800">
-                <strong>Transfer Özeti:</strong><br />
-                {getProductName(formData.productId)}<br />
-                {branches.find(b => b.value === formData.fromBranch)?.label} →{' '}
-                {branches.find(b => b.value === formData.toBranch)?.label}<br />
-                Miktar: {formData.quantity} adet
+                <strong>Ürün:</strong> {getProductName(formData.productId)}<br />
+                <strong>Kaynak:</strong> {branches.find(b => b.value === formData.fromBranch)?.label}<br />
+                <strong>Hedef:</strong> {branches.find(b => b.value === formData.toBranch)?.label}<br />
+                <strong>Miktar:</strong> {formData.quantity} adet<br />
+                <strong>Transfer sonrası kaynak stok:</strong> {availableStock - parseInt(formData.quantity)} adet
               </p>
             </div>
           )}
 
           <button
             type="submit"
-            disabled={!canTransfer() || !formData.productId || !formData.toBranch || !formData.quantity}
-            className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50"
+            disabled={
+              loading || 
+              !canTransfer() || 
+              !formData.productId || 
+              !formData.fromBranch ||
+              !formData.toBranch || 
+              !formData.quantity ||
+              availableStock === 0 ||
+              parseInt(formData.quantity) > availableStock
+            }
+            className="w-full btn-primary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <ArrowRightIcon className="h-5 w-5" />
-            Transfer Yap
+            {loading ? 'Transfer yapılıyor...' : 'Transfer Yap'}
           </button>
         </form>
+      </div>
+
+      {/* Transfer geçmişi için alan (opsiyonel) */}
+      <div className="card">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Transfer Kuralları</h3>
+        <ul className="space-y-2 text-sm text-gray-600">
+          <li>✓ Sadece kendi şubenizden transfer yapabilirsiniz</li>
+          <li>✓ Transfer miktarı mevcut stoğu aşamaz</li>
+          <li>✓ Kaynak ve hedef şube aynı olamaz</li>
+          <li>✓ Transfer işlemleri anında gerçekleşir</li>
+          <li>✓ Her transfer işlemi loglanır</li>
+        </ul>
       </div>
     </div>
   );
