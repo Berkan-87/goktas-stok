@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">GOKTAS</string>
+    <string name="title_activity_main">GOKTAS</string>
+    <string name="package_name">com.goktas</string>
+    <string name="custom_url_scheme">com.goktas</string>
+</resources>

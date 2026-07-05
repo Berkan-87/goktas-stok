@@ -15,22 +15,33 @@ const AdminPanel = () => {
     password: '',
     name: '',
     role: 'viewer',
-    branch: ''
+    branch: '',
+    productionRole: '' // Yeni alan
   });
 
   const branches = [
     { value: '', label: 'Şube Seçin (Yönetici için gerekli)' },
-    { value: 'fabrika', label: 'Fabrika' },
-    { value: 'karabaglar', label: 'Karabağlar' },
-    { value: 'manisa', label: 'Manisa' },
-    { value: 'edremit', label: 'Edremit' },
-    { value: 'karsiyaka', label: 'Karşıyaka' }
+    { value: 'fabrika', label: '🏭 Fabrika' },
+    { value: 'karabaglar', label: '🏘️ Karabağlar' },
+    { value: 'manisa', label: '🏙️ Manisa' },
+    { value: 'edremit', label: '🌊 Edremit' },
+    { value: 'karsiyaka', label: '🏖️ Karşıyaka' }
   ];
 
   const roles = [
-    { value: 'admin', label: 'Admin (Tüm yetkiler)' },
-    { value: 'branch_manager', label: 'Şube Yöneticisi (Kendi şubesinde değişiklik yapabilir)' },
-    { value: 'viewer', label: 'Görüntüleyici (Sadece görüntüleme)' }
+    { value: 'admin', label: '👑 Admin (Tüm yetkiler)' },
+    { value: 'branch_manager', label: '📋 Şube Yöneticisi (Kendi şubesinde değişiklik yapabilir)' },
+    { value: 'production_manager', label: '🏭 Üretim Yöneticisi (Üretim aşamalarında yetkili)' },
+    { value: 'viewer', label: '👁️ Görüntüleyici (Sadece görüntüleme)' }
+  ];
+
+  // Üretim aşamaları
+  const productionRoles = [
+    { value: '', label: 'Yetkisi Yok' },
+    { value: 'planlama', label: '📋 Planlamada' },
+    { value: 'uretim', label: '⚙️ Üretimde' },
+    { value: 'paketleme', label: '📦 Paketlemede' },
+    { value: 'hazir', label: '✅ Hazır' }
   ];
 
   useEffect(() => {
@@ -72,7 +83,14 @@ const AdminPanel = () => {
       }
       setShowUserModal(false);
       setEditingUser(null);
-      setFormData({ username: '', password: '', name: '', role: 'viewer', branch: '' });
+      setFormData({ 
+        username: '', 
+        password: '', 
+        name: '', 
+        role: 'viewer', 
+        branch: '',
+        productionRole: '' 
+      });
       fetchUsers();
     } catch (error) {
       toast.error(error.response?.data?.message || 'İşlem başarısız');
@@ -95,6 +113,7 @@ const AdminPanel = () => {
     const labels = {
       admin: '👑 Admin',
       branch_manager: '📋 Şube Yöneticisi',
+      production_manager: '🏭 Üretim Yöneticisi',
       viewer: '👁️ Görüntüleyici'
     };
     return labels[role] || role;
@@ -109,6 +128,21 @@ const AdminPanel = () => {
       karsiyaka: '🏖️ Karşıyaka'
     };
     return branches[branch] || '-';
+  };
+
+  const getProductionRoleLabel = (productionRole) => {
+    const labels = {
+      planlama: '📋 Planlamada',
+      uretim: '⚙️ Üretimde',
+      paketleme: '📦 Paketlemede',
+      hazir: '✅ Hazır'
+    };
+    return labels[productionRole] || '-';
+  };
+
+  // Kullanıcının üretim yetkisi var mı kontrol et
+  const hasProductionRole = (user) => {
+    return user.role === 'production_manager' && user.productionRole;
   };
 
   if (user?.role !== 'admin') {
@@ -129,7 +163,14 @@ const AdminPanel = () => {
         <button
           onClick={() => {
             setEditingUser(null);
-            setFormData({ username: '', password: '', name: '', role: 'viewer', branch: '' });
+            setFormData({ 
+              username: '', 
+              password: '', 
+              name: '', 
+              role: 'viewer', 
+              branch: '',
+              productionRole: '' 
+            });
             setShowUserModal(true);
           }}
           className="btn-primary flex items-center gap-2"
@@ -150,6 +191,7 @@ const AdminPanel = () => {
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">İsim</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Rol</th>
                 <th className="text-left py-3 px-4 font-semibold text-gray-700">Şube</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700">Üretim Yetkisi</th>
                 <th className="text-center py-3 px-4 font-semibold text-gray-700">İşlemler</th>
               </tr>
             </thead>
@@ -160,6 +202,15 @@ const AdminPanel = () => {
                   <td className="py-3 px-4">{u.name}</td>
                   <td className="py-3 px-4">{getRoleLabel(u.role)}</td>
                   <td className="py-3 px-4">{u.branch ? getBranchLabel(u.branch) : '-'}</td>
+                  <td className="py-3 px-4">
+                    {hasProductionRole(u) ? (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                        {getProductionRoleLabel(u.productionRole)}
+                      </span>
+                    ) : (
+                      <span className="text-gray-400 text-sm">-</span>
+                    )}
+                  </td>
                   <td className="py-3 px-4 text-center">
                     <div className="flex justify-center gap-2">
                       <button
@@ -170,7 +221,8 @@ const AdminPanel = () => {
                             password: '',
                             name: u.name,
                             role: u.role,
-                            branch: u.branch || ''
+                            branch: u.branch || '',
+                            productionRole: u.productionRole || ''
                           });
                           setShowUserModal(true);
                         }}
@@ -215,7 +267,7 @@ const AdminPanel = () => {
       {/* User Modal */}
       {showUserModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
             <h2 className="text-xl font-bold mb-4">
               {editingUser ? 'Kullanıcı Düzenle' : 'Yeni Kullanıcı Ekle'}
             </h2>
@@ -246,9 +298,15 @@ const AdminPanel = () => {
                 required={!editingUser}
                 minLength="6"
               />
+              
               <select
                 value={formData.role}
-                onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                onChange={(e) => setFormData({ 
+                  ...formData, 
+                  role: e.target.value,
+                  // Rol değiştiğinde productionRole'u temizle
+                  productionRole: e.target.value === 'production_manager' ? formData.productionRole : ''
+                })}
                 className="input-field mb-3"
                 required
               >
@@ -256,11 +314,13 @@ const AdminPanel = () => {
                   <option key={role.value} value={role.value}>{role.label}</option>
                 ))}
               </select>
-              {formData.role !== 'admin' && (
+
+              {/* Şube seçimi - Admin ve Production Manager için opsiyonel, Branch Manager için zorunlu */}
+              {(formData.role === 'branch_manager' || formData.role === 'production_manager' || formData.role === 'viewer') && (
                 <select
                   value={formData.branch}
                   onChange={(e) => setFormData({ ...formData, branch: e.target.value })}
-                  className="input-field mb-4"
+                  className="input-field mb-3"
                   required={formData.role === 'branch_manager'}
                 >
                   {branches.map(branch => (
@@ -268,6 +328,46 @@ const AdminPanel = () => {
                   ))}
                 </select>
               )}
+
+              {/* Üretim Yetkisi - Sadece Production Manager rolü için */}
+              {formData.role === 'production_manager' && (
+                <div className="mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Üretim Yetkisi
+                  </label>
+                  <select
+                    value={formData.productionRole}
+                    onChange={(e) => setFormData({ ...formData, productionRole: e.target.value })}
+                    className="input-field"
+                    required
+                  >
+                    {productionRoles.map(role => (
+                      <option key={role.value} value={role.value}>{role.label}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Hangi üretim aşamasında yetkili olacağını seçin
+                  </p>
+                </div>
+              )}
+
+              {/* Bilgi notu */}
+              {formData.role === 'production_manager' && !formData.productionRole && (
+                <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-xs text-yellow-700">
+                    ⚠️ Lütfen bir üretim yetkisi seçiniz
+                  </p>
+                </div>
+              )}
+
+              {formData.role === 'admin' && (
+                <div className="mb-3 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-xs text-blue-700">
+                    ℹ️ Admin kullanıcılar tüm yetkilere sahiptir
+                  </p>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button type="submit" className="flex-1 btn-primary">
                   {editingUser ? 'Güncelle' : 'Ekle'}

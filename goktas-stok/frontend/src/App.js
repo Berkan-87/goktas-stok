@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
+import Production from './pages/Production';
 import StockList from './pages/StockList';
 import Transfer from './pages/Transfer';
 import History from './pages/History';
@@ -23,6 +24,7 @@ function App() {
         <Route path="/" element={<PrivateRoute />}>
           <Route element={<MainLayout />}>
             <Route index element={<Dashboard />} />
+            <Route path="uretim" element={<Production />} />
             <Route path="stoklar" element={<StockList />} />
             <Route path="transfer" element={<Transfer />} />
             <Route path="gecmis" element={<History />} />

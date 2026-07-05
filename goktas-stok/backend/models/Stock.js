@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const stockSchema = new mongoose.Schema({
   productId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Product',
+    ref: 'Product', // ✅ Product modeline referans
     required: true
   },
   branch: {
@@ -13,7 +13,6 @@ const stockSchema = new mongoose.Schema({
   },
   quantity: {
     type: Number,
-    required: true,
     default: 0,
     min: 0
   },
@@ -27,6 +26,10 @@ const stockSchema = new mongoose.Schema({
   }
 });
 
-stockSchema.index({ productId: 1, branch: 1 }, { unique: true });
+// Her güncellemede tarihi güncelle
+stockSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
 
 module.exports = mongoose.model('Stock', stockSchema);

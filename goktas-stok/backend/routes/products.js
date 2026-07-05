@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
-const Product = require('../models/Product');
+const Product = require('../models/Product'); // ✅ DOĞRU - Product modeli
 const Stock = require('../models/Stock');
 const auth = require('../middleware/auth');
 const { admin } = require('../middleware/authorize');
@@ -80,7 +80,6 @@ router.delete('/:id', [auth, admin], async (req, res) => {
       return res.status(404).json({ message: 'Ürün bulunamadı' });
     }
 
-    // Soft delete
     product.isActive = false;
     await product.save();
 

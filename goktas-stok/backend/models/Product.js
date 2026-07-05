@@ -30,4 +30,9 @@ const productSchema = new mongoose.Schema({
   }
 });
 
+// ✅ `isActive` alanını kontrol eden metod
+productSchema.methods.isProductActive = function() {
+  return this.isActive !== false;
+};
+
 module.exports = mongoose.model('Product', productSchema);

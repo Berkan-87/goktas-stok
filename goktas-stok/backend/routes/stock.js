@@ -10,7 +10,7 @@ const { canModifyBranch } = require('../middleware/authorize');
 // Tüm şubelerin stoklarını getir
 router.get('/', auth, async (req, res) => {
   try {
-    const stocks = await Stock.find().populate('productId', 'code name');
+    const stocks = await Stock.find().populate('productId', 'code name isActive');
     res.json(stocks);
   } catch (error) {
     console.error(error);
@@ -22,7 +22,7 @@ router.get('/', auth, async (req, res) => {
 router.get('/branch/:branch', auth, async (req, res) => {
   try {
     const { branch } = req.params;
-    const stocks = await Stock.find({ branch }).populate('productId', 'code name');
+    const stocks = await Stock.find({ branch }).populate('productId', 'code name isActive');
     res.json(stocks);
   } catch (error) {
     console.error(error);
@@ -30,7 +30,7 @@ router.get('/branch/:branch', auth, async (req, res) => {
   }
 });
 
-// Stok girişi (sadece yetkili şube)
+// Stok girişi
 router.post('/in', [
   auth,
   canModifyBranch(req => req.body.branch)
@@ -47,6 +47,12 @@ router.post('/in', [
     }
 
     const { productId, branch, quantity, note } = req.body;
+    
+    // Ürünün aktif olup olmadığını kontrol et
+    const product = await Product.findById(productId);
+    if (!product || !product.isActive) {
+      return res.status(404).json({ message: 'Ürün bulunamadı veya pasif' });
+    }
     
     const stock = await Stock.findOne({ productId, branch });
     if (!stock) {
@@ -82,7 +88,7 @@ router.post('/in', [
   }
 });
 
-// Stok çıkışı (sadece yetkili şube)
+// Stok çıkışı
 router.post('/out', [
   auth,
   canModifyBranch(req => req.body.branch)
@@ -99,6 +105,12 @@ router.post('/out', [
     }
 
     const { productId, branch, quantity, note } = req.body;
+    
+    // Ürünün aktif olup olmadığını kontrol et
+    const product = await Product.findById(productId);
+    if (!product || !product.isActive) {
+      return res.status(404).json({ message: 'Ürün bulunamadı veya pasif' });
+    }
     
     const stock = await Stock.findOne({ productId, branch });
     if (!stock) {

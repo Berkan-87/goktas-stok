@@ -9,12 +9,15 @@ import {
   ClockIcon, 
   UserGroupIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  CogIcon, // Üretim ikonu için
+  ChartBarIcon // Alternatif ikon
 } from '@heroicons/react/24/outline';
 
 const navigation = [
-  { name: 'Dashboard', href: '/', icon: HomeIcon },
+  { name: 'Ana Sayfa', href: '/', icon: HomeIcon },
   { name: 'Stok Listesi', href: '/stoklar', icon: CubeIcon },
+  { name: 'Üretim', href: '/uretim', icon: CogIcon }, // Yeni eklendi
   { name: 'Transfer', href: '/transfer', icon: ArrowsRightLeftIcon },
   { name: 'Geçmiş', href: '/gecmis', icon: ClockIcon },
 ];
@@ -36,6 +39,14 @@ const MainLayout = () => {
     manisa: '🏙️ Manisa',
     edremit: '🌊 Edremit',
     karsiyaka: '🏖️ Karşıyaka'
+  };
+
+  // Kullanıcının Üretim bölümünü görüp göremeyeceğini kontrol et
+  const canSeeProduction = () => {
+    if (user?.role === 'admin') return true;
+    if (user?.role === 'production_manager') return true;
+    if (user?.role === 'branch_manager') return true;
+    return false;
   };
 
   return (
@@ -70,19 +81,25 @@ const MainLayout = () => {
         </div>
 
         <nav className="mt-6 px-4">
-          {navigation.map((item) => (
-            <button
-              key={item.name}
-              onClick={() => {
-                navigate(item.href);
-                setSidebarOpen(false);
-              }}
-              className="flex items-center w-full px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors mb-1"
-            >
-              <item.icon className="h-5 w-5 mr-3" />
-              {item.name}
-            </button>
-          ))}
+          {navigation.map((item) => {
+            // Üretim menüsünü sadece yetkili kullanıcılara göster
+            if (item.name === 'Üretim' && !canSeeProduction()) {
+              return null;
+            }
+            return (
+              <button
+                key={item.name}
+                onClick={() => {
+                  navigate(item.href);
+                  setSidebarOpen(false);
+                }}
+                className="flex items-center w-full px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors mb-1"
+              >
+                <item.icon className="h-5 w-5 mr-3" />
+                {item.name}
+              </button>
+            );
+          })}
 
           {user?.role === 'admin' && (
             <button
@@ -105,7 +122,9 @@ const MainLayout = () => {
               <p className="text-xs text-gray-500">{user?.username}</p>
               <p className="text-xs text-gray-400 mt-1">
                 {user?.role === 'admin' ? '👑 Admin' : 
-                 user?.role === 'branch_manager' ? '📋 Şube Yöneticisi' : '👁️ Görüntüleyici'}
+                 user?.role === 'branch_manager' ? '📋 Şube Yöneticisi' : 
+                 user?.role === 'production_manager' ? '🏭 Üretim Yöneticisi' :
+                 '👁️ Görüntüleyici'}
               </p>
             </div>
           </div>

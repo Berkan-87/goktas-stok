@@ -14,13 +14,20 @@ const userSchema = new mongoose.Schema({
   },
   role: {
     type: String,
-    enum: ['admin', 'branch_manager', 'viewer'],
+    enum: ['admin', 'branch_manager', 'production_manager', 'viewer'], // 'production_manager' eklendi
     required: true
   },
   branch: {
     type: String,
     enum: ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka', null],
     default: null
+  },
+  // Üretim yetkisi için yeni alan
+  productionRole: {
+    type: String,
+    enum: ['planlama', 'uretim', 'paketleme', 'hazir', null],
+    default: null,
+    description: 'Hangi üretim aşamasında yetkili olduğunu belirtir'
   },
   name: {
     type: String,
@@ -36,12 +43,14 @@ const userSchema = new mongoose.Schema({
   }
 });
 
+// Şifre hashleme
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 10);
   next();
 });
 
+// Şifre karşılaştırma
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
