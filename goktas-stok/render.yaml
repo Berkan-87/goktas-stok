@@ -1,29 +1,29 @@
-# backend için servis
-- type: web
-  name: goktas-stok-backend
-  runtime: node
-  rootDir: backend
-  buildCommand: npm install
-  startCommand: npm start
-  envVars:
-    - key: NODE_VERSION
-      value: 20.18.0
-    - key: MONGODB_URI
-      sync: false # Bu değeri Render panelinden manuel ekleyin
-    - key: JWT_SECRET
-      sync: false # Bu değeri Render panelinden manuel ekleyin
-    - key: PORT
-      value: 5000
+services:
+  - type: web
+    name: goktas-stok-backend
+    runtime: node
+    rootDir: backend
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: MONGODB_URI
+        sync: false # Bu değeri Render panelinden manuel ekleyin
+      - key: JWT_SECRET
+        sync: false # Bu değeri Render panelinden manuel ekleyin
+      - key: PORT
+        value: 5000
 
-# frontend için statik site
-- type: web
-  name: goktas-stok-frontend
-  runtime: static
-  rootDir: frontend
-  buildCommand: npm install && npm run build
-  staticPublishPath: build
-  envVars:
-    - key: NODE_VERSION
-      value: 20.18.0
-    - key: REACT_APP_API_URL
-      value: https://goktas-stok-backend.onrender.com/api # Backend URL'i
+  # frontend için statik site
+  - type: web
+    name: goktas-stok-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: build
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: REACT_APP_API_URL
+        value: https://goktas-stok-backend.onrender.com/api # Backend URL'i
