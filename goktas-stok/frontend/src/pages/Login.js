@@ -39,7 +39,7 @@ const Login = () => {
             Göktaş Stok Yönetim Sistemi
           </h2>
           <p className="mt-2 text-center text-sm text-gray-600">
-            Hesabınıza giriş yapın
+            GİRİŞ YAPINIZ.
           </p>
         </div>
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
