@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: 'https://goktas-stok-2.onrender.com/api',
+  baseURL: 'https://goktas-stok-backend.vercel.app/api',
   headers: {
     'Content-Type': 'application/json',
   },
