@@ -206,6 +206,11 @@
     padding-left: 48px !important;
   }
 
+  .main-content {
+    padding-top: 60px !important;
+    padding-bottom: 80px !important;
+  }
+
   .menu-button {
     top: 12px !important;
     left: 12px !important;

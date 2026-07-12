@@ -168,9 +168,9 @@ const MainLayout = () => {
         </div>
       </div>
 
-      {/* Main content */}
+      {/* Main content - ✅ Üst ve alt boşluk eklendi */}
       <div className="lg:pl-64">
-        <main className="p-4 sm:p-6">
+        <main className="p-4 sm:p-6 pt-20 sm:pt-6 pb-24 sm:pb-6">
           <Outlet />
         </main>
       </div>
