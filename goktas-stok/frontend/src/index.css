@@ -3,200 +3,211 @@
 @tailwind utilities;
 
 @layer base {
-    body {
-        @apply bg-gray-50 text-sm sm:text-base;
-        -webkit-tap-highlight-color: transparent;
-    }
+  body {
+    @apply bg-gray-50 text-sm sm:text-base;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-    /* Mobilde form elemanları zoom yapmasın */
-    input,
-    select,
-    textarea {
-        @apply text-base sm:text-sm;
-        font-size: 16px !important;
-    }
+  /* Mobilde form elemanları zoom yapmasın */
+  input,
+  select,
+  textarea {
+    @apply text-base sm:text-sm;
+    font-size: 16px !important;
+  }
 
-    /* Scrollbar stil */
-    ::-webkit-scrollbar {
-        width: 4px;
-        height: 4px;
-    }
+  /* Scrollbar stil */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
 
-    ::-webkit-scrollbar-thumb {
-        @apply bg-gray-300 rounded-full;
-    }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 rounded-full;
+  }
 
-    ::-webkit-scrollbar-track {
-        @apply bg-gray-100;
-    }
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-100;
+  }
 }
 
 @layer components {
-    .btn-primary {
-        @apply bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium text-sm sm:text-base;
-    }
+  .btn-primary {
+    @apply bg-blue-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 font-medium text-sm sm:text-base;
+  }
 
-    .btn-secondary {
-        @apply bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-medium text-sm sm:text-base;
-    }
+  .btn-secondary {
+    @apply bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-medium text-sm sm:text-base;
+  }
 
-    .btn-danger {
-        @apply bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium text-sm sm:text-base;
-    }
+  .btn-danger {
+    @apply bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium text-sm sm:text-base;
+  }
 
-    .btn-success {
-        @apply bg-green-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 font-medium text-sm sm:text-base;
-    }
+  .btn-success {
+    @apply bg-green-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 font-medium text-sm sm:text-base;
+  }
 
-    .input-field {
-        @apply w-full px-3 py-2 sm:px-4 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base;
-    }
+  .input-field {
+    @apply w-full px-3 py-2 sm:px-4 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base;
+  }
 
-    .card {
-        @apply bg-white rounded-lg sm:rounded-xl shadow-md p-3 sm:p-4 md:p-6;
-    }
+  .card {
+    @apply bg-white rounded-lg sm:rounded-xl shadow-md p-3 sm:p-4 md:p-6;
+  }
 
-    /* Mobil tablo sarmalayıcı */
-    .table-responsive {
-        @apply overflow-x-auto -mx-3 sm:-mx-4 md:mx-0;
-    }
+  /* Mobil tablo sarmalayıcı */
+  .table-responsive {
+    @apply overflow-x-auto -mx-3 sm:-mx-4 md:mx-0;
+  }
 
-    .table-responsive table {
-        @apply min-w-full;
-    }
+  .table-responsive table {
+    @apply min-w-full;
+  }
 
-    /* Mobil kart görünümü */
-    .card-mobile {
-        @apply bg-white rounded-lg shadow p-3 sm:p-4;
-    }
+  /* Mobil kart görünümü */
+  .card-mobile {
+    @apply bg-white rounded-lg shadow p-3 sm:p-4;
+  }
 
-    /* Mobil modal */
-    .modal-mobile {
-        @apply fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50;
-    }
+  /* Mobil modal */
+  .modal-mobile {
+    @apply fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50;
+  }
 
-    .modal-mobile-content {
-        @apply bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto;
-    }
+  .modal-mobile-content {
+    @apply bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto;
+  }
 }
 
 /* Mobil cihazlar için özel düzeltmeler */
 @media (max-width: 640px) {
+  /* Butonlar daha tıklanabilir */
+  button,
+  .btn-primary,
+  .btn-secondary,
+  .btn-danger,
+  .btn-success {
+    min-height: 44px;
+  }
 
-    /* Butonlar daha tıklanabilir */
-    button,
-    .btn-primary,
-    .btn-secondary,
-    .btn-danger,
-    .btn-success {
-        min-height: 44px;
-    }
+  /* Kart içi boşluklar */
+  .card {
+    padding: 12px !important;
+  }
 
-    /* Kart içi boşluklar */
-    .card {
-        padding: 12px !important;
-    }
+  /* Tablo hücreleri */
+  td,
+  th {
+    padding: 8px 10px !important;
+    font-size: 13px !important;
+  }
 
-    /* Tablo hücreleri */
-    td,
-    th {
-        padding: 8px 10px !important;
-        font-size: 13px !important;
-    }
+  /* Modal içi */
+  .modal-mobile-content {
+    padding: 16px !important;
+    border-radius: 16px 16px 0 0 !important;
+  }
 
-    /* Modal içi */
-    .modal-mobile-content {
-        padding: 16px !important;
-        border-radius: 16px 16px 0 0 !important;
-    }
+  /* Başlıklar */
+  h1 {
+    font-size: 20px !important;
+  }
 
-    /* Başlıklar */
-    h1 {
-        font-size: 20px !important;
-    }
+  h2 {
+    font-size: 18px !important;
+  }
 
-    h2 {
-        font-size: 18px !important;
-    }
+  /* Grid düzeni - 2 sütun 1 sütuna dönüşür */
+  .grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
 
-    /* Grid düzeni - 2 sütun 1 sütuna dönüşür */
-    .grid-cols-2 {
-        grid-template-columns: 1fr !important;
-    }
+  /* Grid düzeni - 3 sütun 1 sütuna dönüşür */
+  .grid-cols-3 {
+    grid-template-columns: 1fr !important;
+  }
 
-    /* Grid düzeni - 3 sütun 1 sütuna dönüşür */
-    .grid-cols-3 {
-        grid-template-columns: 1fr !important;
-    }
+  /* Flex düzeni */
+  .flex-wrap-mobile {
+    flex-wrap: wrap !important;
+  }
 
-    /* Flex düzeni */
-    .flex-wrap-mobile {
-        flex-wrap: wrap !important;
-    }
+  /* Form alanları */
+  .input-field {
+    padding: 10px 12px !important;
+    font-size: 16px !important;
+  }
 
-    /* Form alanları */
-    .input-field {
-        padding: 10px 12px !important;
-        font-size: 16px !important;
-    }
+  /* Mobilde gizle */
+  .hidden-mobile {
+    display: none !important;
+  }
 
-    /* Mobilde gizle */
-    .hidden-mobile {
-        display: none !important;
-    }
+  /* Mobilde göster */
+  .block-mobile {
+    display: block !important;
+  }
 
-    /* Mobilde göster */
-    .block-mobile {
-        display: block !important;
-    }
+  /* Container padding */
+  .container-mobile {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
 
-    /* Container padding */
-    .container-mobile {
-        padding-left: 12px !important;
-        padding-right: 12px !important;
-    }
+  /* Modal butonları */
+  .modal-actions {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
 
-    /* Modal butonları */
-    .modal-actions {
-        flex-direction: column !important;
-        gap: 8px !important;
-    }
-
-    .modal-actions button {
-        width: 100% !important;
-    }
+  .modal-actions button {
+    width: 100% !important;
+  }
 }
 
 /* Tablet cihazlar için (641px - 1024px) */
 @media (min-width: 641px) and (max-width: 1024px) {
-    .card {
-        padding: 16px !important;
-    }
+  .card {
+    padding: 16px !important;
+  }
 
-    .grid-cols-2 {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 
-    .grid-cols-3 {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
+  .grid-cols-3 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 }
 
 /* Masaüstü için (1025px ve üzeri) */
 @media (min-width: 1025px) {
-    .card {
-        padding: 24px !important;
-    }
+  .card {
+    padding: 24px !important;
+  }
 
-    .grid-cols-2 {
-        grid-template-columns: repeat(2, 1fr) !important;
-    }
+  .grid-cols-2 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
 
-    .grid-cols-3 {
-        grid-template-columns: repeat(3, 1fr) !important;
-    }
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
 
-    .grid-cols-4 {
-        grid-template-columns: repeat(4, 1fr) !important;
-    }
+  .grid-cols-4 {
+    grid-template-columns: repeat(4, 1fr) !important;
+  }
+}
+
+/* Mobilde menü ikonu ile başlık çakışmasını önle */
+@media (max-width: 640px) {
+  .dashboard-header {
+    padding-left: 48px !important;
+  }
+
+  .menu-button {
+    top: 12px !important;
+    left: 12px !important;
+  }
 }

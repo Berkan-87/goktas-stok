@@ -84,9 +84,13 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Hoş Geldiniz, {user?.name}!</h1>
-        <p className="text-gray-600 mt-1">Stok yönetim sistemine genel bakış</p>
+      <div className="pl-12 sm:pl-0">  {/* ✅ Mobilde padding eklendi */}
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
+          Hoş geldiniz, {user?.name}!
+        </h1>
+        <p className="text-sm text-gray-600 mt-1">
+          Stok yönetim sistemine genel bakış
+        </p>
       </div>
 
       {/* Stats Grid */}
