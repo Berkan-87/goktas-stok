@@ -10,14 +10,13 @@ import {
   UserGroupIcon,
   Bars3Icon,
   XMarkIcon,
-  CogIcon, // Üretim ikonu için
-  ChartBarIcon // Alternatif ikon
+  CogIcon
 } from '@heroicons/react/24/outline';
 
 const navigation = [
   { name: 'Ana Sayfa', href: '/', icon: HomeIcon },
   { name: 'Stok Listesi', href: '/stoklar', icon: CubeIcon },
-  { name: 'Üretim', href: '/uretim', icon: CogIcon }, // Yeni eklendi
+  { name: 'Üretim', href: '/uretim', icon: CogIcon },
   { name: 'Transfer', href: '/transfer', icon: ArrowsRightLeftIcon },
   { name: 'Geçmiş', href: '/gecmis', icon: ClockIcon },
 ];
@@ -41,7 +40,6 @@ const MainLayout = () => {
     karsiyaka: '🏖️ Karşıyaka'
   };
 
-  // Kullanıcının Üretim bölümünü görüp göremeyeceğini kontrol et
   const canSeeProduction = () => {
     if (user?.role === 'admin') return true;
     if (user?.role === 'production_manager') return true;
@@ -49,8 +47,44 @@ const MainLayout = () => {
     return false;
   };
 
+  // ✅ Mobil için alt menü butonları
+  const MobileNav = () => (
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
+      <div className="flex justify-around items-center h-16">
+        {navigation.map((item) => {
+          if (item.name === 'Üretim' && !canSeeProduction()) return null;
+          return (
+            <button
+              key={item.name}
+              onClick={() => {
+                navigate(item.href);
+                setSidebarOpen(false);
+              }}
+              className="flex flex-col items-center justify-center text-xs text-gray-600 hover:text-blue-600"
+            >
+              <item.icon className="h-6 w-6" />
+              <span className="mt-1">{item.name}</span>
+            </button>
+          );
+        })}
+        {user?.role === 'admin' && (
+          <button
+            onClick={() => {
+              navigate('/admin');
+              setSidebarOpen(false);
+            }}
+            className="flex flex-col items-center justify-center text-xs text-gray-600 hover:text-blue-600"
+          >
+            <UserGroupIcon className="h-6 w-6" />
+            <span className="mt-1">Admin</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 pb-16 lg:pb-0">
       {/* Mobil sidebar toggle */}
       <div className="lg:hidden fixed top-4 left-4 z-50">
         <button
@@ -82,10 +116,7 @@ const MainLayout = () => {
 
         <nav className="mt-6 px-4">
           {navigation.map((item) => {
-            // Üretim menüsünü sadece yetkili kullanıcılara göster
-            if (item.name === 'Üretim' && !canSeeProduction()) {
-              return null;
-            }
+            if (item.name === 'Üretim' && !canSeeProduction()) return null;
             return (
               <button
                 key={item.name}
@@ -139,10 +170,13 @@ const MainLayout = () => {
 
       {/* Main content */}
       <div className="lg:pl-64">
-        <main className="p-6">
+        <main className="p-4 sm:p-6">
           <Outlet />
         </main>
       </div>
+
+      {/* Mobil Alt Menü */}
+      <MobileNav />
 
       {/* Overlay for mobile */}
       {sidebarOpen && (

@@ -4,28 +4,129 @@
 
 @layer base {
     body {
-        @apply bg-gray-50;
+        @apply bg-gray-50 text-sm sm:text-base;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* Mobilde form elemanları zoom yapmasın */
+    input,
+    select,
+    textarea {
+        @apply text-base sm:text-sm;
+        font-size: 16px !important;
+    }
+
+    /* Scrollbar stil */
+    ::-webkit-scrollbar {
+        width: 4px;
+        height: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb {
+        @apply bg-gray-300 rounded-full;
+    }
+
+    ::-webkit-scrollbar-track {
+        @apply bg-gray-100;
     }
 }
 
 @layer components {
     .btn-primary {
-        @apply bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors duration-200 font-medium;
+        @apply bg-primary-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-primary-700 transition-colors duration-200 font-medium text-sm sm:text-base;
     }
 
     .btn-secondary {
-        @apply bg-gray-200 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-medium;
+        @apply bg-gray-200 text-gray-800 px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-gray-300 transition-colors duration-200 font-medium text-sm sm:text-base;
     }
 
     .btn-danger {
-        @apply bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium;
+        @apply bg-red-600 text-white px-3 py-2 sm:px-4 sm:py-2 rounded-lg hover:bg-red-700 transition-colors duration-200 font-medium text-sm sm:text-base;
     }
 
     .input-field {
-        @apply w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+        @apply w-full px-3 py-2 sm:px-4 sm:py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm sm:text-base;
     }
 
     .card {
-        @apply bg-white rounded-xl shadow-md p-6;
+        @apply bg-white rounded-lg sm:rounded-xl shadow-md p-3 sm:p-4 md:p-6;
+    }
+
+    /* Mobil tablo sarmalayıcı */
+    .table-responsive {
+        @apply overflow-x-auto -mx-3 sm:-mx-4 md:mx-0;
+    }
+
+    .table-responsive table {
+        @apply min-w-full;
+    }
+
+    /* Mobil kart görünümü */
+    .card-mobile {
+        @apply bg-white rounded-lg shadow p-3 sm:p-4;
+    }
+
+    /* Mobil modal */
+    .modal-mobile {
+        @apply fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50;
+    }
+
+    .modal-mobile-content {
+        @apply bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto;
+    }
+}
+
+/* Mobil cihazlar için özel düzeltmeler */
+@media (max-width: 640px) {
+
+    /* Butonlar daha tıklanabilir */
+    button,
+    .btn-primary,
+    .btn-secondary,
+    .btn-danger {
+        min-height: 44px;
+    }
+
+    /* Kart içi boşluklar */
+    .card {
+        padding: 12px !important;
+    }
+
+    /* Tablo hücreleri */
+    td,
+    th {
+        padding: 8px 10px !important;
+        font-size: 13px !important;
+    }
+
+    /* Modal içi */
+    .modal-mobile-content {
+        padding: 16px !important;
+        border-radius: 16px 16px 0 0 !important;
+    }
+
+    /* Başlıklar */
+    h1 {
+        font-size: 20px !important;
+    }
+
+    h2 {
+        font-size: 18px !important;
+    }
+
+    /* Grid düzeni */
+    .grid-cols-2 {
+        grid-template-columns: 1fr !important;
+    }
+
+    /* Flex düzeni */
+    .flex-wrap-mobile {
+        flex-wrap: wrap !important;
+    }
+
+    /* Form alanları */
+    .input-field {
+        padding: 10px 12px !important;
+        font-size: 16px !important;
     }
 }
