@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -11,9 +11,23 @@ import History from './pages/History';
 import AdminPanel from './pages/AdminPanel';
 import PrivateRoute from './components/PrivateRoute';
 import MainLayout from './components/Layout/MainLayout';
+import { setUser } from './store/slices/authSlice';
 
 function App() {
   const { isAuthenticated } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+
+  // ✅ Sayfa yenilendiğinde user bilgisini Redux'a geri yükle
+  useEffect(() => {
+    const user = localStorage.getItem('user');
+    if (user) {
+      try {
+        dispatch(setUser(JSON.parse(user)));
+      } catch (error) {
+        console.error('Kullanıcı geri yüklenirken hata:', error);
+      }
+    }
+  }, [dispatch]);
 
   return (
     <Router>
