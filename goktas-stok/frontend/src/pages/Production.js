@@ -176,14 +176,15 @@ const Production = () => {
       </div>
 
       {/* ✅ Aşama Sekmeleri - Mobilde Alt Alta */}
+      {/* Aşama Sekmeleri - Mobilde Alt Alta */}
       <div className="flex flex-wrap gap-2 pb-2">
         {stages.map((stage) => (
           <button
             key={stage.id}
             onClick={() => setActiveTab(stage.id)}
             className={`
-              px-3 py-2 sm:px-6 sm:py-3 rounded-lg font-medium transition-all text-xs sm:text-base
-              flex-1 sm:flex-none min-w-[60px] sm:min-w-[120px]
+              px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg font-medium transition-all text-xs sm:text-sm
+              flex-1 sm:flex-none min-w-[60px] sm:min-w-[100px]
               ${activeTab === stage.id 
                 ? 'bg-blue-600 text-white shadow-lg' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}

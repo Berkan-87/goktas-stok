@@ -44,6 +44,7 @@ const MainLayout = () => {
     if (user?.role === 'admin') return true;
     if (user?.role === 'production_manager') return true;
     if (user?.role === 'branch_manager') return true;
+    if (user?.role === 'viewer') return true;
     return false;
   };
 
