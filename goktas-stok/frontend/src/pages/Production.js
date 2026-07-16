@@ -157,8 +157,8 @@ const Production = () => {
   const canAdd = activeTab === 'planlama' && canManageStage('planlama');
 
   return (
-    <div className="space-y-4 sm:space-y-6">
-      {/* Başlık - Mobil uyumlu */}
+    <div className="space-y-4 sm:space-y-6 w-full">
+      {/* Başlık ve Buton Alanı - Mobilde alt alta, sm ekranda yan yana */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">🏭 Üretim Takibi</h1>
@@ -175,25 +175,26 @@ const Production = () => {
         )}
       </div>
 
-      {/* ✅ Aşama Sekmeleri - Mobilde Alt Alta */}
-      {/* Aşama Sekmeleri - Mobilde Alt Alta */}
-      <div className="flex flex-wrap gap-2 pb-2">
+      {/* ✅ Aşama Sekmeleri - Mobilde Dikey Alt Alta, Geniş Ekranda Yan Yana */}
+      <div className="flex flex-col sm:flex-row gap-2 pb-2">
         {stages.map((stage) => (
           <button
             key={stage.id}
             onClick={() => setActiveTab(stage.id)}
             className={`
-              px-3 py-2 sm:px-4 sm:py-2.5 rounded-lg font-medium transition-all text-xs sm:text-sm
-              flex-1 sm:flex-none min-w-[60px] sm:min-w-[100px]
+              px-3 py-2.5 sm:px-4 sm:py-2.5 rounded-lg font-medium transition-all text-xs sm:text-sm
+              w-full sm:flex-1 text-left sm:text-center flex justify-between sm:justify-center items-center gap-2
               ${activeTab === stage.id 
                 ? 'bg-blue-600 text-white shadow-lg' 
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
             `}
           >
-            <span className="hidden xs:inline">{stage.icon}</span>
-            <span className="ml-0 sm:ml-1">{stage.label}</span>
-            <span className="ml-1 text-xs opacity-75">
-              ({orders.length})
+            <div className="flex items-center gap-2">
+              <span>{stage.icon}</span>
+              <span>{stage.label.replace(stage.icon, '').trim()}</span>
+            </div>
+            <span className={`text-xs opacity-75 px-2 py-0.5 rounded-full ${activeTab === stage.id ? 'bg-blue-700' : 'bg-gray-200'}`}>
+              {orders.filter(o => o.stage === stage.id).length || orders.length && activeTab === stage.id ? orders.length : 0}
             </span>
           </button>
         ))}
@@ -287,7 +288,7 @@ const Production = () => {
         </div>
       </div>
 
-      {/* Silme Onay Modalı - Mobil uyumlu */}
+      {/* Silme Onay Modalı */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -324,7 +325,7 @@ const Production = () => {
         </div>
       )}
 
-      {/* Yeni Sipariş Ekleme Modal - Mobil uyumlu */}
+      {/* Yeni Sipariş Ekleme Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-2xl w-full mx-auto max-h-[90vh] overflow-y-auto">
