@@ -1,12 +1,18 @@
 import axios from 'axios';
 
 const instance = axios.create({
-  baseURL: 'https://goktas-stok-backend.vercel.app/api',
+  // ✅ DOĞRU VE GÜNCEL BACKEND ADRESİ
+  baseURL: 'https://goktas-stok-2.onrender.com/api',
+  
+  // ❌ ESKİ VE YANLIŞ ADRES (KALDIRILDI)
+  // baseURL: 'https://goktas-stok-backend.vercel.app/api',
+  
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
+// Request interceptor - Token ekleme
 instance.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -20,11 +26,14 @@ instance.interceptors.request.use(
   }
 );
 
+// Response interceptor - Hata yönetimi
 instance.interceptors.response.use(
   (response) => response,
   (error) => {
+    // 401 Unauthorized hatası alınırsa token'ı temizle ve login'e yönlendir
     if (error.response?.status === 401) {
       localStorage.removeItem('token');
+      localStorage.removeItem('user');
       window.location.href = '/login';
     }
     return Promise.reject(error);
