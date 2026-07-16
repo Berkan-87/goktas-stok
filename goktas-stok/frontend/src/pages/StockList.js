@@ -332,7 +332,7 @@ const StockList = () => {
                     ) : (
                       <div>
                         <div className="font-medium text-gray-900">{product.name}</div>
-                        <div className="text-xs text-gray-400">{product.code}</div>
+                        {/* <div className="text-xs text-gray-400">{product.code}</div> */}
                       </div>
                     )}
                   </td>
