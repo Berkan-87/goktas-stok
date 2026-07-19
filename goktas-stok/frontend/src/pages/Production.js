@@ -156,9 +156,116 @@ const Production = () => {
 
   const canAdd = activeTab === 'planlama' && canManageStage('planlama');
 
+  // ✅ Mobil Kart Bileşeni
+  const MobileOrderCard = ({ order }) => {
+    const showDelete = canDelete(order.stage);
+    const showMove = activeTab !== 'tamamlandi' && canManageStage(activeTab);
+
+    return (
+      <div className="bg-white rounded-lg shadow-md p-4 mb-3 border border-gray-100 hover:shadow-lg transition-shadow">
+        {/* Sipariş No ve İşlem Butonları */}
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-blue-600 text-sm">#{order.orderNo}</span>
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+              {stages.find(s => s.id === order.stage)?.label || order.stage}
+            </span>
+          </div>
+          <div className="flex gap-1">
+            {showMove && (
+              <button
+                onClick={() => handleMoveStage(order._id, activeTab)}
+                className="p-1.5 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                title="İleri Taşı"
+              >
+                <ArrowRightIcon className="h-4 w-4" />
+              </button>
+            )}
+            {activeTab === 'tamamlandi' && !showDelete && (
+              <CheckCircleIcon className="h-5 w-5 text-green-600" />
+            )}
+            {showDelete && (
+              <button
+                onClick={() => setShowDeleteModal({
+                  id: order._id,
+                  orderNo: order.orderNo,
+                  customer: order.customer
+                })}
+                className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                title="Siparişi Sil"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Müşteri ve Model */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <div>
+            <p className="text-xs text-gray-400">Müşteri</p>
+            <p className="text-sm font-medium text-gray-800">{order.customer}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Model</p>
+            <p className="text-sm font-medium text-gray-800">{order.model}</p>
+          </div>
+        </div>
+
+        {/* Renk, Adet ve Zaman */}
+        <div className="grid grid-cols-3 gap-2 mb-2">
+          <div>
+            <p className="text-xs text-gray-400">Renk</p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <span 
+                className="w-3 h-3 rounded-full border border-gray-300" 
+                style={{ 
+                  backgroundColor: order.color.toLowerCase().includes('beyaz') ? '#f5f5f5' :
+                                order.color.toLowerCase().includes('siyah') ? '#1a1a1a' :
+                                order.color.toLowerCase().includes('kırmızı') ? '#dc2626' :
+                                order.color.toLowerCase().includes('mavi') ? '#2563eb' :
+                                order.color.toLowerCase().includes('yeşil') ? '#16a34a' :
+                                order.color.toLowerCase().includes('sarı') ? '#eab308' :
+                                order.color.toLowerCase().includes('gri') ? '#6b7280' :
+                                order.color.toLowerCase().includes('lacivert') ? '#1e3a8a' :
+                                order.color.toLowerCase().includes('bordo') ? '#7f1d1d' :
+                                '#9ca3af'
+                }}
+              />
+              <span className="text-sm text-gray-700 truncate">{order.color}</span>
+            </div>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Adet</p>
+            <p className="text-sm font-bold text-gray-900">{order.quantity}</p>
+          </div>
+          <div>
+            <p className="text-xs text-gray-400">Süre</p>
+            <div className="flex items-center gap-1 mt-0.5">
+              <ClockIcon className="h-3 w-3 text-gray-400" />
+              <span className="text-xs text-gray-600">
+                {calculateDuration(order.stageHistory?.[order.stage]?.startedAt)}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Bu Aşamada */}
+        <div className="border-t border-gray-100 pt-2 mt-1">
+          <div className="flex justify-between items-center text-xs">
+            <span className="text-gray-400">Bu aşamada:</span>
+            <span className="text-gray-600">
+              {formatDate(order.stageHistory?.[order.stage]?.startedAt)}
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
-      {/* Başlık ve Buton Alanı - Mobilde alt alta, sm ekranda yan yana */}
+      {/* Başlık ve Buton Alanı */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">🏭 Üretim Takibi</h1>
@@ -175,45 +282,51 @@ const Production = () => {
         )}
       </div>
 
-      {/* ✅ Aşama Sekmeleri - Mobilde Dikey Alt Alta, Geniş Ekranda Yan Yana */}
+      {/* ✅ Aşama Sekmeleri - Mobilde Dikey */}
       <div className="flex flex-col sm:flex-row gap-2 pb-2">
-        {stages.map((stage) => (
-          <button
-            key={stage.id}
-            onClick={() => setActiveTab(stage.id)}
-            className={`
-              px-3 py-2.5 sm:px-4 sm:py-2.5 rounded-lg font-medium transition-all text-xs sm:text-sm
-              w-full sm:flex-1 text-left sm:text-center flex justify-between sm:justify-center items-center gap-2
-              ${activeTab === stage.id 
-                ? 'bg-blue-600 text-white shadow-lg' 
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
-            `}
-          >
-            <div className="flex items-center gap-2">
-              <span>{stage.icon}</span>
-              <span>{stage.label.replace(stage.icon, '').trim()}</span>
-            </div>
-            <span className={`text-xs opacity-75 px-2 py-0.5 rounded-full ${activeTab === stage.id ? 'bg-blue-700' : 'bg-gray-200'}`}>
-              {orders.filter(o => o.stage === stage.id).length || orders.length && activeTab === stage.id ? orders.length : 0}
-            </span>
-          </button>
-        ))}
+        {stages.map((stage) => {
+          const count = orders.filter(o => o.stage === stage.id).length;
+          return (
+            <button
+              key={stage.id}
+              onClick={() => setActiveTab(stage.id)}
+              className={`
+                px-3 py-2.5 sm:px-4 sm:py-2.5 rounded-lg font-medium transition-all text-xs sm:text-sm
+                w-full sm:flex-1 text-left sm:text-center flex justify-between sm:justify-center items-center gap-2
+                ${activeTab === stage.id 
+                  ? 'bg-blue-600 text-white shadow-lg' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
+              `}
+            >
+              <div className="flex items-center gap-2">
+                <span>{stage.icon}</span>
+                <span>{stage.label.replace(stage.icon, '').trim()}</span>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${
+                activeTab === stage.id ? 'bg-blue-700' : 'bg-gray-200'
+              }`}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Sipariş Listesi - Mobil uyumlu */}
-      <div className="card overflow-x-auto">
-        <div className="min-w-[600px] sm:min-w-full">
+      {/* ✅ Sipariş Listesi - Mobilde Kart, Masaüstünde Tablo */}
+      <div className="card overflow-hidden">
+        {/* Masaüstü Tablosu (md ve üzeri) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200">
-                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">Sip. No</th>
-                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">Cari</th>
-                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm hidden sm:table-cell">Model</th>
-                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm hidden md:table-cell">Renk</th>
-                <th className="text-center py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">Adet</th>
-                <th className="text-left py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm hidden lg:table-cell">Bu Aşamada</th>
-                <th className="text-center py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm hidden md:table-cell">Süre</th>
-                <th className="text-center py-2 sm:py-3 px-2 sm:px-4 font-semibold text-gray-700 text-xs sm:text-sm">İşlem</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Sip. No</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Cari</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Model</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Renk</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 text-sm">Adet</th>
+                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Bu Aşamada</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 text-sm">Süre</th>
+                <th className="text-center py-3 px-4 font-semibold text-gray-700 text-sm">İşlem</th>
               </tr>
             </thead>
             <tbody>
@@ -230,40 +343,53 @@ const Production = () => {
                   
                   return (
                     <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-2 sm:py-3 px-2 sm:px-4 font-mono text-xs sm:text-sm font-bold">{order.orderNo}</td>
-                      <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm">{order.customer}</td>
-                      <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm hidden sm:table-cell">{order.model}</td>
-                      <td className="py-2 sm:py-3 px-2 sm:px-4 hidden md:table-cell">
-                        <span className="px-2 py-1 bg-gray-100 rounded text-xs">{order.color}</span>
+                      <td className="py-3 px-4 font-mono text-sm font-bold">{order.orderNo}</td>
+                      <td className="py-3 px-4 text-sm">{order.customer}</td>
+                      <td className="py-3 px-4 text-sm">{order.model}</td>
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          <span 
+                            className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0" 
+                            style={{ 
+                              backgroundColor: order.color.toLowerCase().includes('beyaz') ? '#f5f5f5' :
+                                            order.color.toLowerCase().includes('siyah') ? '#1a1a1a' :
+                                            order.color.toLowerCase().includes('kırmızı') ? '#dc2626' :
+                                            order.color.toLowerCase().includes('mavi') ? '#2563eb' :
+                                            order.color.toLowerCase().includes('yeşil') ? '#16a34a' :
+                                            order.color.toLowerCase().includes('sarı') ? '#eab308' :
+                                            order.color.toLowerCase().includes('gri') ? '#6b7280' :
+                                            '#9ca3af'
+                            }}
+                          />
+                          <span className="text-sm">{order.color}</span>
+                        </div>
                       </td>
-                      <td className="py-2 sm:py-3 px-2 sm:px-4 text-center font-semibold text-xs sm:text-sm">{order.quantity}</td>
-                      <td className="py-2 sm:py-3 px-2 sm:px-4 text-xs sm:text-sm hidden lg:table-cell">
+                      <td className="py-3 px-4 text-center font-semibold text-sm">{order.quantity}</td>
+                      <td className="py-3 px-4 text-sm">
                         {formatDate(order.stageHistory?.[order.stage]?.startedAt)}
                       </td>
-                      <td className="py-2 sm:py-3 px-2 sm:px-4 text-center hidden md:table-cell">
-                        <div className="flex items-center justify-center gap-1 text-xs sm:text-sm">
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex items-center justify-center gap-1 text-sm">
                           <ClockIcon className="h-4 w-4 text-gray-400" />
                           <span className="font-mono">
                             {calculateDuration(order.stageHistory?.[order.stage]?.startedAt)}
                           </span>
                         </div>
                       </td>
-                      <td className="py-2 sm:py-3 px-2 sm:px-4 text-center">
-                        <div className="flex justify-center gap-1 sm:gap-2">
+                      <td className="py-3 px-4 text-center">
+                        <div className="flex justify-center gap-2">
                           {showMove && (
                             <button
                               onClick={() => handleMoveStage(order._id, activeTab)}
-                              className="p-1.5 sm:p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                              className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
                               title="İleri Taşı"
                             >
-                              <ArrowRightIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                              <ArrowRightIcon className="h-5 w-5" />
                             </button>
                           )}
-                          
                           {activeTab === 'tamamlandi' && !showDelete && (
                             <CheckCircleIcon className="h-5 w-5 text-green-600" />
                           )}
-                          
                           {showDelete && (
                             <button
                               onClick={() => setShowDeleteModal({
@@ -271,10 +397,10 @@ const Production = () => {
                                 orderNo: order.orderNo,
                                 customer: order.customer
                               })}
-                              className="p-1.5 sm:p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                              className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
                               title="Siparişi Sil"
                             >
-                              <TrashIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                              <TrashIcon className="h-5 w-5" />
                             </button>
                           )}
                         </div>
@@ -286,9 +412,22 @@ const Production = () => {
             </tbody>
           </table>
         </div>
+
+        {/* Mobil Kart Görünümü (md altı) */}
+        <div className="md:hidden p-2">
+          {orders.length === 0 ? (
+            <div className="text-center py-8 text-gray-500 text-sm">
+              Bu aşamada sipariş bulunmuyor
+            </div>
+          ) : (
+            orders.map((order) => (
+              <MobileOrderCard key={order._id} order={order} />
+            ))
+          )}
+        </div>
       </div>
 
-      {/* Silme Onay Modalı */}
+      {/* Modaller (Aynı) */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -325,7 +464,6 @@ const Production = () => {
         </div>
       )}
 
-      {/* Yeni Sipariş Ekleme Modal */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-2xl w-full mx-auto max-h-[90vh] overflow-y-auto">
