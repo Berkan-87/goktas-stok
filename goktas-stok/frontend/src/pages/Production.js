@@ -162,7 +162,7 @@ const Production = () => {
     const showMove = activeTab !== 'tamamlandi' && canManageStage(activeTab);
 
     return (
-      <div className="bg-white rounded-lg shadow-md p-4 mb-3 border border-gray-100 hover:shadow-lg transition-shadow">
+      <div className="bg-white rounded-lg shadow-md p-4 mb-3 border border-gray-100 hover:shadow-lg transition-shadow w-full min-h-[40px]">
         {/* Sipariş No ve İşlem Butonları */}
         <div className="flex justify-between items-start mb-2">
           <div className="flex items-center gap-2">
