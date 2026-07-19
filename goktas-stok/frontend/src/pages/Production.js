@@ -162,27 +162,27 @@ const Production = () => {
     const showMove = activeTab !== 'tamamlandi' && canManageStage(activeTab);
 
     return (
-      <div className="bg-white rounded-lg shadow-md p-4 mb-3 border border-gray-100 hover:shadow-lg transition-shadow w-full min-h-[40px]">
-        {/* Sipariş No ve İşlem Butonları */}
-        <div className="flex justify-between items-start mb-2">
+      <div className="bg-white rounded-lg shadow-sm p-3 mb-2 border border-gray-100 hover:shadow-md transition-all duration-200">
+        {/* Üst Satır: Sipariş No, Durum ve İşlemler */}
+        <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-2">
             <span className="font-bold text-blue-600 text-sm">#{order.orderNo}</span>
-            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+            <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
               {stages.find(s => s.id === order.stage)?.label || order.stage}
             </span>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-0.5">
             {showMove && (
               <button
                 onClick={() => handleMoveStage(order._id, activeTab)}
-                className="p-1.5 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
+                className="p-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
                 title="İleri Taşı"
               >
-                <ArrowRightIcon className="h-4 w-4" />
+                <ArrowRightIcon className="h-3.5 w-3.5" />
               </button>
             )}
             {activeTab === 'tamamlandi' && !showDelete && (
-              <CheckCircleIcon className="h-5 w-5 text-green-600" />
+              <CheckCircleIcon className="h-4 w-4 text-green-500" />
             )}
             {showDelete && (
               <button
@@ -191,77 +191,55 @@ const Production = () => {
                   orderNo: order.orderNo,
                   customer: order.customer
                 })}
-                className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
+                className="p-1 bg-red-50 text-red-500 rounded hover:bg-red-100 transition-colors"
                 title="Siparişi Sil"
               >
-                <TrashIcon className="h-4 w-4" />
+                <TrashIcon className="h-3.5 w-3.5" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Müşteri ve Model */}
-        <div className="grid grid-cols-2 gap-2 mb-2">
-          <div>
-            <p className="text-xs text-gray-400">Müşteri</p>
-            <p className="text-sm font-medium text-gray-800">{order.customer}</p>
-          </div>
-          <div>
-            <p className="text-xs text-gray-400">Model</p>
-            <p className="text-sm font-medium text-gray-800">{order.model}</p>
-          </div>
+        {/* Orta Satır: Müşteri - Model - Adet */}
+        <div className="flex items-center gap-2 text-sm mb-1.5">
+          <span className="font-medium text-gray-800 truncate flex-1">{order.customer}</span>
+          <span className="text-gray-400">•</span>
+          <span className="text-gray-600 truncate flex-1">{order.model}</span>
+          <span className="text-gray-400">•</span>
+          <span className="font-semibold text-gray-900">{order.quantity} adet</span>
         </div>
 
-        {/* Renk, Adet ve Zaman */}
-        <div className="grid grid-cols-3 gap-2 mb-2">
-          <div>
-            <p className="text-xs text-gray-400">Renk</p>
-            <div className="flex items-center gap-1 mt-0.5">
-              <span 
-                className="w-3 h-3 rounded-full border border-gray-300" 
-                style={{ 
-                  backgroundColor: order.color.toLowerCase().includes('beyaz') ? '#f5f5f5' :
-                                order.color.toLowerCase().includes('siyah') ? '#1a1a1a' :
-                                order.color.toLowerCase().includes('kırmızı') ? '#dc2626' :
-                                order.color.toLowerCase().includes('mavi') ? '#2563eb' :
-                                order.color.toLowerCase().includes('yeşil') ? '#16a34a' :
-                                order.color.toLowerCase().includes('sarı') ? '#eab308' :
-                                order.color.toLowerCase().includes('gri') ? '#6b7280' :
-                                order.color.toLowerCase().includes('lacivert') ? '#1e3a8a' :
-                                order.color.toLowerCase().includes('bordo') ? '#7f1d1d' :
-                                '#9ca3af'
-                }}
-              />
-              <span className="text-sm text-gray-700 truncate">{order.color}</span>
-            </div>
+        {/* Alt Satır: Renk - Süre - Aşama Zamanı */}
+        <div className="flex items-center justify-between text-xs text-gray-500 border-t border-gray-50 pt-1.5">
+          <div className="flex items-center gap-1.5">
+            <span 
+              className="w-2.5 h-2.5 rounded-full border border-gray-200 flex-shrink-0" 
+              style={{ 
+                backgroundColor: order.color.toLowerCase().includes('beyaz') ? '#f5f5f5' :
+                              order.color.toLowerCase().includes('siyah') ? '#1a1a1a' :
+                              order.color.toLowerCase().includes('kırmızı') ? '#dc2626' :
+                              order.color.toLowerCase().includes('mavi') ? '#2563eb' :
+                              order.color.toLowerCase().includes('yeşil') ? '#16a34a' :
+                              order.color.toLowerCase().includes('sarı') ? '#eab308' :
+                              order.color.toLowerCase().includes('gri') ? '#6b7280' :
+                              order.color.toLowerCase().includes('lacivert') ? '#1e3a8a' :
+                              order.color.toLowerCase().includes('bordo') ? '#7f1d1d' :
+                              '#9ca3af'
+              }}
+            />
+            <span className="truncate max-w-[60px]">{order.color}</span>
           </div>
-          <div>
-            <p className="text-xs text-gray-400">Adet</p>
-            <p className="text-sm font-bold text-gray-900">{order.quantity}</p>
+          <div className="flex items-center gap-1">
+            <ClockIcon className="h-3 w-3 text-gray-400" />
+            <span>{calculateDuration(order.stageHistory?.[order.stage]?.startedAt)}</span>
           </div>
-          <div>
-            <p className="text-xs text-gray-400">Süre</p>
-            <div className="flex items-center gap-1 mt-0.5">
-              <ClockIcon className="h-3 w-3 text-gray-400" />
-              <span className="text-xs text-gray-600">
-                {calculateDuration(order.stageHistory?.[order.stage]?.startedAt)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Bu Aşamada */}
-        <div className="border-t border-gray-100 pt-2 mt-1">
-          <div className="flex justify-between items-center text-xs">
-            <span className="text-gray-400">Bu aşamada:</span>
-            <span className="text-gray-600">
-              {formatDate(order.stageHistory?.[order.stage]?.startedAt)}
-            </span>
-          </div>
+          <span className="text-gray-400 text-[10px]">
+            {formatDate(order.stageHistory?.[order.stage]?.startedAt)}
+          </span>
         </div>
       </div>
     );
-  };
+  }; // ✅ Buraya dikkat! MobileOrderCard burada kapanıyor
 
   return (
     <div className="space-y-4 sm:space-y-6 w-full">
@@ -427,7 +405,7 @@ const Production = () => {
         </div>
       </div>
 
-      {/* Modaller (Aynı) */}
+      {/* Silme Onay Modalı */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -464,6 +442,7 @@ const Production = () => {
         </div>
       )}
 
+      {/* Yeni Sipariş Ekleme Modalı */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-2xl w-full mx-auto max-h-[90vh] overflow-y-auto">
