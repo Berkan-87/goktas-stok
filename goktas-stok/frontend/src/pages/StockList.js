@@ -155,9 +155,9 @@ const StockList = () => {
     return Math.min(percentage, 100);
   };
 
-  // Mobil görünüm için kart
-  const MobileStockCard = ({ product, quantity, barWidth, barColor, status }) => (
-    <div className="bg-white rounded-lg shadow p-3 mb-3 border border-gray-100">
+  // Mobil görünüm için kart (isEvenGroup prop'una göre arka plan rengi değişiyor)
+  const MobileStockCard = ({ product, quantity, barWidth, barColor, status, isEvenGroup }) => (
+    <div className={`rounded-lg shadow-sm p-3 mb-3 border transition-colors ${isEvenGroup ? 'bg-white border-gray-100' : 'bg-gray-50/90 border-gray-200/60'}`}>
       <div className="flex justify-between items-start mb-2">
         <div className="flex-1">
           <div className="font-medium text-gray-900 text-sm">{product.name}</div>
@@ -170,7 +170,7 @@ const StockList = () => {
       </div>
       
       <div className="flex items-center gap-2 mb-3">
-        <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
+        <div className="flex-1 h-6 bg-white/60 shadow-inner border border-gray-100 rounded-full overflow-hidden">
           <div 
             className={`h-full ${barColor} transition-all duration-300 rounded-full`}
             style={{ width: `${barWidth}%` }}
@@ -291,14 +291,20 @@ const StockList = () => {
             </tr>
           </thead>
           <tbody>
-            {products.map(product => {
+            {products.map((product, index) => {
               const quantity = getStockForProduct(product._id);
               const barWidth = getBarWidth(quantity);
               const barColor = getStockColor(quantity);
               const status = getStockStatus(quantity);
               
+              // Her 3 satırda bir rengi değiştiren matematiksel formül
+              const isEvenGroup = Math.floor(index / 3) % 2 === 0;
+              
               return (
-                <tr key={product._id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr 
+                  key={product._id} 
+                  className={`border-b border-gray-100 transition-colors hover:bg-blue-50/40 ${isEvenGroup ? 'bg-white' : 'bg-gray-50/70'}`}
+                >
                   <td className="py-3 px-4">
                     {editingProduct?._id === product._id && user?.role === 'admin' ? (
                       <form onSubmit={handleEditProduct} className="flex flex-col gap-2">
@@ -332,7 +338,6 @@ const StockList = () => {
                     ) : (
                       <div>
                         <div className="font-medium text-gray-900">{product.name}</div>
-                        {/* <div className="text-xs text-gray-400">{product.code}</div> */}
                       </div>
                     )}
                   </td>
@@ -342,7 +347,7 @@ const StockList = () => {
                   </td>
                   <td className="py-3 px-4">
                     <div className="flex items-center gap-3">
-                      <div className="flex-1 h-6 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="flex-1 h-6 bg-gray-100/80 shadow-inner rounded-full overflow-hidden">
                         <div className={`h-full ${barColor} transition-all duration-300 rounded-full`} style={{ width: `${barWidth}%` }} />
                       </div>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${status.bg} ${status.color}`}>
@@ -408,11 +413,12 @@ const StockList = () => {
 
       {/* Mobile Cards - visible on mobile */}
       <div className="md:hidden">
-        {products.map(product => {
+        {products.map((product, index) => {
           const quantity = getStockForProduct(product._id);
           const barWidth = getBarWidth(quantity);
           const barColor = getStockColor(quantity);
           const status = getStockStatus(quantity);
+          const isEvenGroup = Math.floor(index / 3) % 2 === 0;
           
           return (
             <MobileStockCard
@@ -422,6 +428,7 @@ const StockList = () => {
               barWidth={barWidth}
               barColor={barColor}
               status={status}
+              isEvenGroup={isEvenGroup}
             />
           );
         })}
