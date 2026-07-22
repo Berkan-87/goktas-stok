@@ -13,7 +13,7 @@ const users = [
   // Admin
   { 
     username: 'admin', 
-    password: 'admin123', 
+    password: 'Admin2026!', 
     name: 'Admin User', 
     role: 'admin', 
     branch: null,
@@ -23,7 +23,7 @@ const users = [
   // Şube Yöneticileri
   { 
     username: 'fabrika', 
-    password: '123456', 
+    password: 'Fabrika2026!', 
     name: 'Fabrika Yöneticisi', 
     role: 'branch_manager', 
     branch: 'fabrika',
@@ -31,7 +31,7 @@ const users = [
   },
   { 
     username: 'karabaglar', 
-    password: '123456', 
+    password: 'Karabaglar2026!', 
     name: 'Karabağlar Yöneticisi', 
     role: 'branch_manager', 
     branch: 'karabaglar',
@@ -39,7 +39,7 @@ const users = [
   },
   { 
     username: 'manisa', 
-    password: '123456', 
+    password: 'Manisa2026!', 
     name: 'Manisa Yöneticisi', 
     role: 'branch_manager', 
     branch: 'manisa',
@@ -47,7 +47,7 @@ const users = [
   },
   { 
     username: 'edremit', 
-    password: '123456', 
+    password: 'Edremit2026!', 
     name: 'Edremit Yöneticisi', 
     role: 'branch_manager', 
     branch: 'edremit',
@@ -55,7 +55,7 @@ const users = [
   },
   { 
     username: 'karsiyaka', 
-    password: '123456', 
+    password: 'Karsiyaka2026!', 
     name: 'Karşıyaka Yöneticisi', 
     role: 'branch_manager', 
     branch: 'karsiyaka',
@@ -65,7 +65,7 @@ const users = [
   // Üretim Yöneticileri
   { 
     username: 'planlama', 
-    password: '123456', 
+    password: 'Planlama2026!', 
     name: 'Planlama Sorumlusu', 
     role: 'production_manager', 
     branch: 'fabrika',
@@ -73,7 +73,7 @@ const users = [
   },
   { 
     username: 'uretim_sorumlu', 
-    password: '123456', 
+    password: 'Uretim2026!', 
     name: 'Üretim Sorumlusu', 
     role: 'production_manager', 
     branch: 'fabrika',
@@ -81,7 +81,7 @@ const users = [
   },
   { 
     username: 'paketleme', 
-    password: '123456', 
+    password: 'Paketleme2026!', 
     name: 'Paketleme Sorumlusu', 
     role: 'production_manager', 
     branch: 'fabrika',
@@ -89,7 +89,7 @@ const users = [
   },
   { 
     username: 'hazir_sorumlu', 
-    password: '123456', 
+    password: 'Hazir2026!', 
     name: 'Hazır Sorumlusu', 
     role: 'production_manager', 
     branch: 'fabrika',
@@ -99,7 +99,7 @@ const users = [
   // Görüntüleyici
   { 
     username: 'viewer', 
-    password: '123456', 
+    password: 'Viewer2026!', 
     name: 'Görüntüleyici Kullanıcı', 
     role: 'viewer', 
     branch: 'fabrika',
@@ -203,13 +203,17 @@ async function seed() {
     console.log('='.repeat(50));
     
     console.log('\n🔑 Demo Giriş Bilgileri:');
-    console.log('  Admin: admin / admin123');
-    console.log('  Fabrika: fabrika / 123456');
-    console.log('  Planlama: planlama / 123456');
-    console.log('  Üretim: uretim_sorumlu / 123456');
-    console.log('  Paketleme: paketleme / 123456');
-    console.log('  Hazır: hazir_sorumlu / 123456');
-    console.log('  Görüntüleyici: viewer / 123456');
+    console.log('  👑 Admin: admin / Admin2026!');
+    console.log('  🏭 Fabrika: fabrika / Fabrika2026!');
+    console.log('  🏘️ Karabağlar: karabaglar / Karabaglar2026!');
+    console.log('  🏙️ Manisa: manisa / Manisa2026!');
+    console.log('  🌊 Edremit: edremit / Edremit2026!');
+    console.log('  🏖️ Karşıyaka: karsiyaka / Karsiyaka2026!');
+    console.log('  📋 Planlama: planlama / Planlama2026!');
+    console.log('  ⚙️ Üretim: uretim_sorumlu / Uretim2026!');
+    console.log('  📦 Paketleme: paketleme / Paketleme2026!');
+    console.log('  ✅ Hazır: hazir_sorumlu / Hazir2026!');
+    console.log('  👁️ Görüntüleyici: viewer / Viewer2026!');
 
     process.exit(0);
   } catch (error) {
