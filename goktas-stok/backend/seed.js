@@ -13,7 +13,7 @@ const users = [
   // Admin
   { 
     username: 'admin', 
-    password: 'Admin2026!', 
+    password: 'Admin2026x', 
     name: 'Admin User', 
     role: 'admin', 
     branch: null,
@@ -203,7 +203,7 @@ async function seed() {
     console.log('='.repeat(50));
     
     console.log('\n🔑 Demo Giriş Bilgileri:');
-    console.log('  👑 Admin: admin / Admin2026!');
+    console.log('  👑 Admin: admin / Admin2026x');
     console.log('  🏭 Fabrika: fabrika / Fabrika2026!');
     console.log('  🏘️ Karabağlar: karabaglar / Karabaglar2026!');
     console.log('  🏙️ Manisa: manisa / Manisa2026!');
