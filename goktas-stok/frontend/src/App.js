@@ -18,7 +18,6 @@ function App() {
   const { isAuthenticated } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
 
-  // ✅ Sayfa yenilendiğinde user bilgisini Redux'a geri yükle
   useEffect(() => {
     const user = localStorage.getItem('user');
     if (user) {
@@ -36,14 +35,15 @@ function App() {
       <Routes>
         <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" />} />
         
-        <Route path="/" element={<PrivateRoute />}>
+        {/* ✅ BURASI DÜZELTİLDİ - OUTLET KULLAN */}
+        <Route element={<PrivateRoute />}>
           <Route element={<MainLayout />}>
             <Route index element={<Dashboard />} />
-            <Route path="uretim" element={<Production />} />
             <Route path="stoklar" element={<StockList />} />
+            <Route path="uretim" element={<Production />} />
             <Route path="transfer" element={<Transfer />} />
-            <Route path="gecmis" element={<History />} />
             <Route path="sohbet" element={<Chat />} />
+            <Route path="gecmis" element={<History />} />
             <Route path="admin" element={<AdminPanel />} />
           </Route>
         </Route>

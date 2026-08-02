@@ -1,5 +1,5 @@
-import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import React, { useState } from 'react';
+import { Link, useLocation, Outlet } from 'react-router-dom'; // ✅ Outlet'i import et
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
 import {
@@ -14,7 +14,9 @@ import {
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
-const MainLayout = ({ children }) => {
+const MainLayout = () => { // ✅ children prop'unu kaldır, Outlet kullan
+  console.log('🔥 MainLayout render oldu!');
+
   const { user } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const location = useLocation();
@@ -23,13 +25,12 @@ const MainLayout = ({ children }) => {
   const menuItems = [
     { name: 'Ana Sayfa', icon: HomeIcon, path: '/' },
     { name: 'Stoklar', icon: CubeIcon, path: '/stoklar' },
-    { name: 'Siparişler', icon: ClipboardDocumentListIcon, path: '/siparisler' },
+    { name: 'Siparişler', icon: ClipboardDocumentListIcon, path: '/uretim' },
     { name: 'Transfer', icon: ArrowsRightLeftIcon, path: '/transfer' },
     { name: 'Sohbet', icon: ChatBubbleLeftRightIcon, path: '/sohbet' },
     { name: 'Geçmiş', icon: ClockIcon, path: '/gecmis' },
   ];
 
-  // Admin panel sadece admin ve branch_manager için
   if (user?.role === 'admin' || user?.role === 'branch_manager') {
     menuItems.push({ name: 'Admin Panel', icon: UserCircleIcon, path: '/admin' });
   }
@@ -54,13 +55,11 @@ const MainLayout = ({ children }) => {
       <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       } lg:translate-x-0`}>
-        {/* Logo */}
         <div className="p-6 border-b border-gray-200">
           <h1 className="text-2xl font-bold text-blue-600">🚪 Göktaş Stok</h1>
           <p className="text-sm text-gray-500 mt-1">{user?.name}</p>
         </div>
 
-        {/* Menü */}
         <nav className="p-4 space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
@@ -84,7 +83,6 @@ const MainLayout = ({ children }) => {
           })}
         </nav>
 
-        {/* Çıkış */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
           <button
             onClick={() => dispatch(logout())}
@@ -96,14 +94,13 @@ const MainLayout = ({ children }) => {
         </div>
       </div>
 
-      {/* Ana İçerik */}
+      {/* ✅ ANA İÇERİK - Outlet ile alt route'lar render edilir */}
       <div className="lg:ml-64 min-h-screen">
         <div className="p-4 lg:p-8 mt-16 lg:mt-0">
-          {children}
+          <Outlet /> {/* ✅ Bu satır çok önemli! */}
         </div>
       </div>
 
-      {/* Mobil overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"

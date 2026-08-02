@@ -21,6 +21,7 @@ const Chat = () => {
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [newGroup, setNewGroup] = useState({ name: '', description: '', members: [] });
   const [selectedUsers, setSelectedUsers] = useState([]);
+  const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
@@ -66,28 +67,37 @@ const Chat = () => {
 
   const fetchGeneralMessages = async () => {
     try {
+      setLoading(true);
       const response = await axios.get('/messages/general');
       setMessages(response.data);
     } catch (error) {
       console.error('Genel mesajlar alınamadı:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchPrivateMessages = async (userId) => {
     try {
+      setLoading(true);
       const response = await axios.get(`/messages/private/${userId}`);
       setMessages(response.data);
     } catch (error) {
       console.error('Özel mesajlar alınamadı:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const fetchGroupMessages = async (groupId) => {
     try {
+      setLoading(true);
       const response = await axios.get(`/messages/group/${groupId}`);
       setMessages(response.data);
     } catch (error) {
       console.error('Grup mesajları alınamadı:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -172,22 +182,26 @@ const Chat = () => {
             <UserGroupIcon className="h-4 w-4" />
             Özel Mesajlar
           </h4>
-          {users.map(u => (
-            <button
-              key={u._id}
-              onClick={() => setActiveChat({ type: 'private', id: u._id })}
-              className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
-                activeChat.type === 'private' && activeChat.id === u._id
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'hover:bg-gray-100'
-              }`}
-            >
-              <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600">
-                {u.name?.charAt(0).toUpperCase() || '?'}
-              </div>
-              {u.name}
-            </button>
-          ))}
+          {users.length === 0 ? (
+            <p className="text-sm text-gray-400 px-3 py-2">Başka kullanıcı yok</p>
+          ) : (
+            users.map(u => (
+              <button
+                key={u._id}
+                onClick={() => setActiveChat({ type: 'private', id: u._id })}
+                className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
+                  activeChat.type === 'private' && activeChat.id === u._id
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'hover:bg-gray-100'
+                }`}
+              >
+                <div className="w-6 h-6 rounded-full bg-gray-300 flex items-center justify-center text-xs font-bold text-gray-600">
+                  {u.name?.charAt(0).toUpperCase() || '?'}
+                </div>
+                {u.name}
+              </button>
+            ))
+          )}
         </div>
 
         {/* Gruplar */}
@@ -204,20 +218,24 @@ const Chat = () => {
               <PlusCircleIcon className="h-5 w-5" />
             </button>
           </div>
-          {groups.map(g => (
-            <button
-              key={g._id}
-              onClick={() => setActiveChat({ type: 'group', id: g._id })}
-              className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
-                activeChat.type === 'group' && activeChat.id === g._id
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'hover:bg-gray-100'
-              }`}
-            >
-              <UserGroupIcon className="h-4 w-4" />
-              {g.name}
-            </button>
-          ))}
+          {groups.length === 0 ? (
+            <p className="text-sm text-gray-400 px-3 py-2">Henüz grup yok</p>
+          ) : (
+            groups.map(g => (
+              <button
+                key={g._id}
+                onClick={() => setActiveChat({ type: 'group', id: g._id })}
+                className={`w-full text-left px-3 py-2 rounded-lg mb-1 transition-colors flex items-center gap-2 ${
+                  activeChat.type === 'group' && activeChat.id === g._id
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'hover:bg-gray-100'
+                }`}
+              >
+                <UserGroupIcon className="h-4 w-4" />
+                {g.name}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
@@ -227,15 +245,20 @@ const Chat = () => {
         <div className="p-4 border-b border-gray-200 bg-white flex items-center gap-2">
           <ChatBubbleLeftRightIcon className="h-5 w-5 text-blue-600" />
           <h3 className="font-semibold">
-            {activeChat.type === 'general' && 'Genel Sohbet'}
-            {activeChat.type === 'private' && `Özel Sohbet - ${getUserName(activeChat.id)}`}
-            {activeChat.type === 'group' && `Grup - ${groups.find(g => g._id === activeChat.id)?.name || 'Grup'}`}
+            {activeChat.type === 'general' && '🌐 Genel Sohbet'}
+            {activeChat.type === 'private' && `💌 ${getUserName(activeChat.id)}`}
+            {activeChat.type === 'group' && `👥 ${groups.find(g => g._id === activeChat.id)?.name || 'Grup'}`}
           </h3>
         </div>
 
         {/* Mesajlar */}
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
-          {messages.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-500">Yükleniyor...</p>
+            </div>
+          ) : messages.length === 0 ? (
             <div className="text-center text-gray-400 py-12">
               <ChatBubbleLeftRightIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
               <p>Henüz mesaj yok</p>
