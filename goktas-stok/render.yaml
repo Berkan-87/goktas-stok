@@ -27,3 +27,11 @@ services:
         value: 20.18.0
       - key: REACT_APP_API_URL
         value: https://goktas-stok-backend.onrender.com/api # Backend URL'i
+
+  - type: web
+    name: goktas-stok-backend
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    # ❌ postinstall çalışmasını engelle
+    # buildCommand: npm install && npm run seed
