@@ -19,6 +19,9 @@ app.use('/api/stock', require('./routes/stock'));        // Stok yönetimi
 app.use('/api/transfer', require('./routes/transfer'));  // Transfer işlemleri
 app.use('/api/history', require('./routes/history'));    // Geçmiş kayıtları
 app.use('/api/production', require('./routes/production')); // Üretim takibi
+app.use('/api/messages', require('./routes/messages'));  // Mesajlaşma
+app.use('/api/groups', require('./routes/groups'));      // Grup yönetimi
+app.use('/api/users', require('./routes/users'));        // Kullanıcı listesi
 
 // 🔄 OTOMATİK VERİTABANI DOLDURMA (SEED) FONKSİYONU
 const autoSeedDatabase = async () => {
@@ -33,7 +36,7 @@ const autoSeedDatabase = async () => {
     if (!adminExists) {
       console.log('⚠️ Veritabanı boş algılandı! Otomatik yükleme (Seed) başlatılıyor...');
 
-      // 1. Kullanıcı Listesi (Şifreler kodun istediği formatta otomatik hashlenir)
+      // 1. Kullanıcı Listesi
       const usersData = [
         { username: 'admin', password: 'admin123', name: 'Admin User', role: 'admin', branch: null, productionRole: null },
         { username: 'fabrika', password: '123456', name: 'Fabrika Yöneticisi', role: 'branch_manager', branch: 'fabrika', productionRole: null },
@@ -50,13 +53,19 @@ const autoSeedDatabase = async () => {
       const createdUsers = await User.create(usersData);
       console.log(`👤 ${createdUsers.length} adet kullanıcı başarıyla oluşturuldu.`);
 
-      // 2. Ürün Listesi
+      // 2. Ürün Listesi - KATEGORİ EKLENDİ
       const productsData = [
-        { code: '618 BUTE 87', name: '618 BUTE 87', description: 'Standart model', unit: 'adet' },
-        { code: '618 BUTE 77', name: '618 BUTE 77', description: 'Premium model', unit: 'adet' },
-        { code: '618 BUTE CAMLI', name: '618 BUTE Camlı', description: 'Camlı model', unit: 'adet' },
-        { code: 'STD-A', name: 'Standart Model A', description: 'Standart üretim modeli', unit: 'adet' },
-        { code: 'PRM-B', name: 'Premium Model B', description: 'Premium üretim modeli', unit: 'adet' }
+        // KANAT ÜRÜNLERİ
+        { code: '618 BUTE 87', name: '618 BUTE 87', description: 'Standart model', unit: 'adet', category: 'kanat' },
+        { code: '618 BUTE 77', name: '618 BUTE 77', description: 'Premium model', unit: 'adet', category: 'kanat' },
+        { code: '618 BUTE CAMLI', name: '618 BUTE Camlı', description: 'Camlı model', unit: 'adet', category: 'kanat' },
+        { code: 'STD-A', name: 'Standart Model A', description: 'Standart üretim modeli', unit: 'adet', category: 'kanat' },
+        { code: 'PRM-B', name: 'Premium Model B', description: 'Premium üretim modeli', unit: 'adet', category: 'kanat' },
+        // KASA TAKIM ÜRÜNLERİ
+        { code: 'KASA-BB-01', name: 'Bute Beyaz Kasa', description: 'Bute beyaz renk kasa takımı', unit: 'adet', category: 'kasa' },
+        { code: 'KASA-KG-01', name: 'Koyu Gri Kasa', description: 'Koyu gri renk kasa takımı', unit: 'adet', category: 'kasa' },
+        { code: 'KASA-AG-01', name: 'Açık Gri Kasa', description: 'Açık gri renk kasa takımı', unit: 'adet', category: 'kasa' },
+        { code: 'KASA-TG-01', name: 'Taş Gri Kasa', description: 'Taş gri renk kasa takımı', unit: 'adet', category: 'kasa' }
       ];
       const createdProducts = await Product.create(productsData);
       console.log(`📦 ${createdProducts.length} adet demo ürün eklendi.`);
@@ -87,7 +96,7 @@ const autoSeedDatabase = async () => {
 };
 
 // MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI)
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/goktas-stok')
   .then(() => {
     console.log('✅ MongoDB connected successfully');
     // Bağlantı başarılı olunca yükleme fonksiyonunu tetikliyoruz
@@ -100,7 +109,7 @@ app.get('/api/test', (req, res) => {
   res.json({ message: 'API çalışıyor!' });
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });

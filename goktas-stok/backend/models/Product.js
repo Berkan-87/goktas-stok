@@ -37,19 +37,4 @@ const productSchema = new mongoose.Schema({
   }
 });
 
-// ✅ `isActive` alanını kontrol eden metod
-productSchema.methods.isProductActive = function() {
-  return this.isActive !== false;
-};
-
-// ✅ Kategori bazında filtreleme için statik metod
-productSchema.statics.findByCategory = function(category) {
-  return this.find({ category, isActive: true });
-};
-
-// ✅ Aktif ürünleri getir
-productSchema.statics.findActive = function() {
-  return this.find({ isActive: true });
-};
-
 module.exports = mongoose.model('Product', productSchema);

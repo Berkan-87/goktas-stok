@@ -7,6 +7,7 @@ import Dashboard from './pages/Dashboard';
 import Production from './pages/Production';
 import StockList from './pages/StockList';
 import Transfer from './pages/Transfer';
+import Chat from './pages/Chat';
 import History from './pages/History';
 import AdminPanel from './pages/AdminPanel';
 import PrivateRoute from './components/PrivateRoute';
@@ -42,6 +43,7 @@ function App() {
             <Route path="stoklar" element={<StockList />} />
             <Route path="transfer" element={<Transfer />} />
             <Route path="gecmis" element={<History />} />
+            <Route path="sohbet" element={<Chat />} />
             <Route path="admin" element={<AdminPanel />} />
           </Route>
         </Route>

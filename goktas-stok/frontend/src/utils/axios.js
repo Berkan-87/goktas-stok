@@ -3,7 +3,7 @@ import axios from 'axios';
 const instance = axios.create({
   // ✅ DOĞRU VE GÜNCEL BACKEND ADRESİ
   baseURL: 'https://goktas-stok-2.onrender.com/api',
-  // baseURL: 'http://localhost:5000/api',
+  // baseURL: 'http://localhost:5001/api',
   
   // ❌ ESKİ VE YANLIŞ ADRES (KALDIRILDI)
   // baseURL: 'https://goktas-stok-backend.vercel.app/api',

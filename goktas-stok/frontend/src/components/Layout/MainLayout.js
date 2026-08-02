@@ -1,188 +1,112 @@
-import React, { useState } from 'react';
-import { Outlet, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import React from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
-import { 
-  HomeIcon, 
-  CubeIcon, 
-  ArrowsRightLeftIcon, 
-  ClockIcon, 
-  UserGroupIcon,
+import {
+  HomeIcon,
+  CubeIcon,
+  ClipboardDocumentListIcon,
+  ArrowsRightLeftIcon,
+  ChatBubbleLeftRightIcon,
+  ClockIcon,
+  UserCircleIcon,
   Bars3Icon,
-  XMarkIcon,
-  CogIcon
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
-const navigation = [
-  { name: 'Ana Sayfa', href: '/', icon: HomeIcon },
-  { name: 'Stoklar', href: '/stoklar', icon: CubeIcon },
-  { name: 'Siparişler', href: '/uretim', icon: CogIcon },
-  { name: 'Transfer', href: '/transfer', icon: ArrowsRightLeftIcon },
-  { name: 'Geçmiş', href: '/gecmis', icon: ClockIcon },
-];
-
-const MainLayout = () => {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const navigate = useNavigate();
-  const dispatch = useDispatch();
+const MainLayout = ({ children }) => {
   const { user } = useSelector((state) => state.auth);
+  const dispatch = useDispatch();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const handleLogout = () => {
-    dispatch(logout());
-    navigate('/login');
-  };
+  const menuItems = [
+    { name: 'Ana Sayfa', icon: HomeIcon, path: '/' },
+    { name: 'Stoklar', icon: CubeIcon, path: '/stoklar' },
+    { name: 'Siparişler', icon: ClipboardDocumentListIcon, path: '/siparisler' },
+    { name: 'Transfer', icon: ArrowsRightLeftIcon, path: '/transfer' },
+    { name: 'Sohbet', icon: ChatBubbleLeftRightIcon, path: '/sohbet' },
+    { name: 'Geçmiş', icon: ClockIcon, path: '/gecmis' },
+  ];
 
-  const branches = {
-    fabrika: '🏭 Fabrika',
-    karabaglar: '🏘️ Karabağlar',
-    manisa: '🏙️ Manisa',
-    edremit: '🌊 Edremit',
-    karsiyaka: '🏖️ Karşıyaka'
-  };
+  // Admin panel sadece admin ve branch_manager için
+  if (user?.role === 'admin' || user?.role === 'branch_manager') {
+    menuItems.push({ name: 'Admin Panel', icon: UserCircleIcon, path: '/admin' });
+  }
 
-  const canSeeProduction = () => {
-    if (user?.role === 'admin') return true;
-    if (user?.role === 'production_manager') return true;
-    if (user?.role === 'branch_manager') return true;
-    if (user?.role === 'viewer') return true;
-    return false;
-  };
-
-  // ✅ Mobil için alt menü butonları
-  const MobileNav = () => (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40">
-      <div className="flex justify-around items-center h-16">
-        {navigation.map((item) => {
-          if (item.name === 'Üretim' && !canSeeProduction()) return null;
-          return (
-            <button
-              key={item.name}
-              onClick={() => {
-                navigate(item.href);
-                setSidebarOpen(false);
-              }}
-              className="flex flex-col items-center justify-center text-xs text-gray-600 hover:text-blue-600"
-            >
-              <item.icon className="h-6 w-6" />
-              <span className="mt-1">{item.name}</span>
-            </button>
-          );
-        })}
-        {user?.role === 'admin' && (
-          <button
-            onClick={() => {
-              navigate('/admin');
-              setSidebarOpen(false);
-            }}
-            className="flex flex-col items-center justify-center text-xs text-gray-600 hover:text-blue-600"
-          >
-            <UserGroupIcon className="h-6 w-6" />
-            <span className="mt-1">Admin</span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
+  const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-16 lg:pb-0">
-      {/* Mobil sidebar toggle */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="p-2 rounded-md bg-white shadow-md"
-        >
-          <Bars3Icon className="h-6 w-6 text-gray-600" />
+    <div className="min-h-screen bg-gray-100">
+      {/* Mobil Menü Butonu */}
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white shadow-md p-4 flex justify-between items-center">
+        <h1 className="text-lg font-bold text-blue-600">🚪 Göktaş Stok</h1>
+        <button onClick={() => setSidebarOpen(!sidebarOpen)}>
+          {sidebarOpen ? (
+            <XMarkIcon className="h-6 w-6" />
+          ) : (
+            <Bars3Icon className="h-6 w-6" />
+          )}
         </button>
       </div>
-      
+
       {/* Sidebar */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
-      }`}>
-        <div className="flex items-center justify-between p-4 border-b">
-          <div>
-            <h1 className="text-xl font-bold text-primary-600">Göktaş Stok</h1>
-            {user?.branch && (
-              <p className="text-xs text-gray-500 mt-1">{branches[user.branch]}</p>
-            )}
-          </div>
-          <button
-            onClick={() => setSidebarOpen(false)}
-            className="lg:hidden p-1"
-          >
-            <XMarkIcon className="h-6 w-6 text-gray-600" />
-          </button>
+      <div className={`fixed inset-y-0 left-0 z-40 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      } lg:translate-x-0`}>
+        {/* Logo */}
+        <div className="p-6 border-b border-gray-200">
+          <h1 className="text-2xl font-bold text-blue-600">🚪 Göktaş Stok</h1>
+          <p className="text-sm text-gray-500 mt-1">{user?.name}</p>
         </div>
 
-        <nav className="mt-6 px-4">
-          {navigation.map((item) => {
-            if (item.name === 'Üretim' && !canSeeProduction()) return null;
+        {/* Menü */}
+        <nav className="p-4 space-y-1">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
             return (
-              <button
-                key={item.name}
-                onClick={() => {
-                  navigate(item.href);
-                  setSidebarOpen(false);
-                }}
-                className="flex items-center w-full px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors mb-1"
+              <Link
+                key={item.path}
+                to={item.path}
+                onClick={() => setSidebarOpen(false)}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                  isActive(item.path)
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-gray-700 hover:bg-gray-100'
+                }`}
               >
-                <item.icon className="h-5 w-5 mr-3" />
-                {item.name}
-              </button>
+                <Icon className={`h-5 w-5 ${
+                  isActive(item.path) ? 'text-blue-600' : 'text-gray-500'
+                }`} />
+                <span className="font-medium">{item.name}</span>
+              </Link>
             );
           })}
-
-          {user?.role === 'admin' && (
-            <button
-              onClick={() => {
-                navigate('/admin');
-                setSidebarOpen(false);
-              }}
-              className="flex items-center w-full px-4 py-3 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors mb-1"
-            >
-              <UserGroupIcon className="h-5 w-5 mr-3" />
-              Admin Panel
-            </button>
-          )}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t">
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <p className="text-sm font-medium text-gray-900">{user?.name}</p>
-              <p className="text-xs text-gray-500">{user?.username}</p>
-              <p className="text-xs text-gray-400 mt-1">
-                {user?.role === 'admin' ? '👑 Admin' : 
-                 user?.role === 'branch_manager' ? '📋 Şube Yöneticisi' : 
-                 user?.role === 'production_manager' ? '🏭 Üretim Yöneticisi' :
-                 '👁️ Görüntüleyici'}
-              </p>
-            </div>
-          </div>
+        {/* Çıkış */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
           <button
-            onClick={handleLogout}
-            className="w-full px-4 py-2 text-sm text-red-600 border border-red-300 rounded-lg hover:bg-red-50 transition-colors"
+            onClick={() => dispatch(logout())}
+            className="flex items-center gap-3 px-4 py-3 w-full rounded-lg text-red-600 hover:bg-red-50 transition-colors"
           >
-            Çıkış Yap
+            <UserCircleIcon className="h-5 w-5" />
+            <span className="font-medium">Çıkış Yap</span>
           </button>
         </div>
       </div>
 
-      {/* Main content - ✅ Üst ve alt boşluk eklendi */}
-      <div className="lg:pl-64">
-        <main className="p-4 sm:p-6 pt-20 sm:pt-6 pb-24 sm:pb-6">
-          <Outlet />
-        </main>
+      {/* Ana İçerik */}
+      <div className="lg:ml-64 min-h-screen">
+        <div className="p-4 lg:p-8 mt-16 lg:mt-0">
+          {children}
+        </div>
       </div>
 
-      {/* Mobil Alt Menü */}
-      <MobileNav />
-
-      {/* Overlay for mobile */}
+      {/* Mobil overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
