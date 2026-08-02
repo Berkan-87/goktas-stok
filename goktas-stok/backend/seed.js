@@ -25,7 +25,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/goktas-st
 
       // 1. Kullanıcılar
       const usersData = [
-        { username: 'admin', password: 'admin123', name: 'Admin User', role: 'admin', branch: null, productionRole: null },
+        { username: 'admin', password: 'Admin2026x', name: 'Admin User', role: 'admin', branch: null, productionRole: null },
         { username: 'fabrika', password: '123456', name: 'Fabrika Yöneticisi', role: 'branch_manager', branch: 'fabrika', productionRole: null },
         { username: 'karabaglar', password: '123456', name: 'Karabağlar Yöneticisi', role: 'branch_manager', branch: 'karabaglar', productionRole: null },
         { username: 'manisa', password: '123456', name: 'Manisa Yöneticisi', role: 'branch_manager', branch: 'manisa', productionRole: null },
