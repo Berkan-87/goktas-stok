@@ -23,7 +23,42 @@ app.use('/api/messages', require('./routes/messages'));  // Mesajlaşma
 app.use('/api/groups', require('./routes/groups'));      // Grup yönetimi
 app.use('/api/users', require('./routes/users'));        // Kullanıcı listesi
 
-// 🔄 OTOMATİK VERİTABANI DOLDURMA (SEED) FONKSİYONU
+// ✅ EKSİK STOKLARI DÜZELT (Verileri sıfırlama!)
+const fixMissingStocks = async () => {
+  try {
+    const Product = require('./models/Product');
+    const Stock = require('./models/Stock');
+    
+    const products = await Product.find({ isActive: true });
+    const branches = ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka'];
+    
+    let createdCount = 0;
+    for (const product of products) {
+      for (const branch of branches) {
+        const existingStock = await Stock.findOne({ 
+          productId: product._id, 
+          branch 
+        });
+        if (!existingStock) {
+          await Stock.create({
+            productId: product._id,
+            branch,
+            quantity: 0,
+            criticalLevel: 10
+          });
+          createdCount++;
+        }
+      }
+    }
+    if (createdCount > 0) {
+      console.log(`✅ ${createdCount} adet eksik stok kaydı oluşturuldu.`);
+    }
+  } catch (error) {
+    console.error('❌ Eksik stok düzeltme hatası:', error);
+  }
+};
+
+// 🔄 OTOMATİK VERİTABANI DOLDURMA (SEED) FONKSİYONU - DÜZELTİLDİ
 const autoSeedDatabase = async () => {
   try {
     const User = require('./models/User');
@@ -87,8 +122,12 @@ const autoSeedDatabase = async () => {
       await Stock.insertMany(stockEntries);
       console.log(`📊 ${stockEntries.length} adet rastgele stok kaydı dağıtıldı.`);
       console.log('🎉 VERİTABANI BAŞARIYLA DOLDURULDU!');
+      
     } else {
       console.log('ℹ️ Veritabanında zaten kayıtlı kullanıcılar var, yükleme atlandı.');
+      
+      // ✅ VERİLERİ SIFIRLAMA, SADECE EKSİK STOKLARI DÜZELT
+      await fixMissingStocks();
     }
   } catch (err) {
     console.error('⚠️ Otomatik veri yükleme hatası:', err.message);
