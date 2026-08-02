@@ -79,7 +79,7 @@ const History = () => {
     const data = transactions.map(t => [
       format(new Date(t.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr }),
       getTypeLabel(t.type).text,
-      t.productId?.name || '-',
+      t.productId?.name || '-', // ✅ SADECE ÜRÜN ADI
       t.quantity,
       getBranchInfo(t),
       t.note || '-',
@@ -199,14 +199,12 @@ const History = () => {
                       </span>
                     </td>
                     <td className="py-3 px-4">
-                      <div>
-                        <p className="font-medium text-gray-900">{transaction.productId?.name}</p>
-                        <p className="text-xs text-gray-500">{transaction.productId?.code}</p>
-                      </div>
+                      {/* ✅ SADECE ÜRÜN ADI - KOD YOK */}
+                      <p className="font-medium text-gray-900">{transaction.productId?.name || '-'}</p>
                     </td>
                     <td className="py-3 px-4 text-right font-semibold">{transaction.quantity} adet</td>
                     <td className="py-3 px-4 text-sm">{getBranchInfo(transaction)}</td>
-                    <td className="py-3 px-4 text-sm">{transaction.user?.name}</td>
+                    <td className="py-3 px-4 text-sm">{transaction.user?.name || '-'}</td>
                     <td className="py-3 px-4 text-sm text-gray-500">{transaction.note || '-'}</td>
                   </tr>
                 );

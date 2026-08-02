@@ -1,79 +1,90 @@
 const mongoose = require('mongoose');
 
-const productionSchema = new mongoose.Schema({
+const ProductionSchema = new mongoose.Schema({
   orderNo: {
     type: String,
-    required: true,
-    unique: true
+    required: [true, 'Sipariş numarası zorunludur'],
+    unique: true,
+    trim: true,
   },
   customer: {
     type: String,
-    required: true
+    required: [true, 'Müşteri adı zorunludur'],
+    trim: true,
   },
   model: {
     type: String,
-    required: true
+    required: [true, 'Model zorunludur'],
+    trim: true,
   },
   color: {
     type: String,
-    required: true
+    required: [true, 'Renk zorunludur'],
+    trim: true,
   },
   quantity: {
     type: Number,
-    required: true,
-    min: 1
+    required: [true, 'Miktar zorunludur'],
+    min: [1, 'Miktar en az 1 olmalıdır'],
   },
-  note: String,
+  note: {
+    type: String,
+    default: '',
+    trim: true,
+  },
   stage: {
     type: String,
-    enum: ['planlama', 'uretim', 'paketleme', 'hazir', 'tamamlandi'],
-    default: 'planlama'
+    enum: {
+      values: ['planlama', 'uretim', 'paketleme', 'depo_hazirlik', 'sevk_alani', 'tamamlandi'],
+      message: 'Geçersiz aşama: {VALUE}',
+    },
+    default: 'planlama',
   },
   stageHistory: {
-    planlama: {
-      startedAt: Date,
-      endedAt: Date,
-      duration: Number
+    type: Map,
+    of: {
+      startedAt: {
+        type: Date,
+        default: Date.now,
+      },
+      completedAt: Date,
     },
-    uretim: {
-      startedAt: Date,
-      endedAt: Date,
-      duration: Number
-    },
-    paketleme: {
-      startedAt: Date,
-      endedAt: Date,
-      duration: Number
-    },
-    hazir: {
-      startedAt: Date,
-      endedAt: Date,
-      duration: Number
-    },
-    tamamlandi: {
-      startedAt: Date,
-      endedAt: Date,
-      duration: Number
-    }
+    default: {},
   },
   createdBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User'
+    ref: 'User',
+    required: true,
   },
   createdAt: {
     type: Date,
-    default: Date.now
+    default: Date.now,
   },
   updatedAt: {
     type: Date,
-    default: Date.now
-  }
+    default: Date.now,
+  },
 });
 
-// Aşama geçişinde zaman hesaplama
-productionSchema.pre('save', function(next) {
+// Her güncellemede updatedAt'i güncelle
+ProductionSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
 
-module.exports = mongoose.model('Production', productionSchema);
+// Yeni sipariş oluşturulurken stageHistory'yi başlat
+ProductionSchema.pre('save', function(next) {
+  if (this.isNew && this.stage) {
+    if (!this.stageHistory || this.stageHistory.size === 0) {
+      this.stageHistory = new Map();
+    }
+    if (!this.stageHistory.get(this.stage)) {
+      this.stageHistory.set(this.stage, {
+        startedAt: new Date(),
+      });
+    }
+  }
+  next();
+});
+
+module.exports = mongoose.model('Production', ProductionSchema);

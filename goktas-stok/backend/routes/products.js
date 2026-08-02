@@ -1,92 +1,101 @@
 const express = require('express');
 const router = express.Router();
-const { body, validationResult } = require('express-validator');
-const Product = require('../models/Product'); // ✅ DOĞRU - Product modeli
-const Stock = require('../models/Stock');
+const Product = require('../models/Product');
 const auth = require('../middleware/auth');
-const { admin } = require('../middleware/authorize');
+const authorize = require('../middleware/authorize');
 
-// Tüm ürünleri getir
+// 📌 Tüm ürünleri getir
 router.get('/', auth, async (req, res) => {
   try {
-    const products = await Product.find({ isActive: true }).sort({ code: 1 });
+    const products = await Product.find({ isActive: true }).sort({ name: 1 });
     res.json(products);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    console.error('❌ Ürünler getirilirken hata:', error);
+    res.status(500).json({ message: error.message });
   }
 });
 
-// Yeni ürün ekle (sadece admin)
-router.post('/', [auth, admin], [
-  body('code').notEmpty().withMessage('Ürün kodu gerekli'),
-  body('name').notEmpty().withMessage('Ürün adı gerekli')
-], async (req, res) => {
+// 📌 Yeni ürün ekle - DÜZELTİLDİ
+router.post('/', auth, authorize.admin, async (req, res) => {
   try {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
-    }
-
-    const { code, name, description, unit } = req.body;
+    console.log('📥 Yeni ürün isteği:', req.body);
     
-    const existingProduct = await Product.findOne({ code });
-    if (existingProduct) {
-      return res.status(400).json({ message: 'Bu ürün kodu zaten mevcut' });
+    const { code, name, description, unit, category } = req.body;
+    
+    // Kategori kontrolü - varsayılan 'kanat'
+    const productCategory = category || 'kanat';
+    
+    // Geçerli kategori mi kontrol et
+    if (!['kanat', 'kasa'].includes(productCategory)) {
+      return res.status(400).json({ 
+        message: 'Geçersiz kategori. Lütfen "kanat" veya "kasa" seçin.' 
+      });
     }
-
-    const product = new Product({ code, name, description, unit });
+    
+    const product = new Product({
+      code,
+      name,
+      description: description || '',
+      unit: unit || 'adet',
+      category: productCategory,
+      isActive: true
+    });
+    
     await product.save();
-
-    // Tüm şubeler için stok kaydı oluştur
-    const branches = ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka'];
-    const stockEntries = branches.map(branch => ({
-      productId: product._id,
-      branch,
-      quantity: 0
-    }));
-    await Stock.insertMany(stockEntries);
-
+    console.log('✅ Ürün eklendi:', product);
     res.status(201).json(product);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    console.error('❌ Ürün eklenirken hata:', error);
+    if (error.code === 11000) {
+      return res.status(400).json({ message: 'Bu kod ile zaten bir ürün var.' });
+    }
+    res.status(400).json({ message: error.message });
   }
 });
 
-// Ürün güncelle (sadece admin)
-router.put('/:id', [auth, admin], async (req, res) => {
+// 📌 Ürün güncelle
+router.put('/:id', auth, authorize.admin, async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const { name, code, description, category, isActive } = req.body;
+    
+    const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Ürün bulunamadı' });
     }
+    
+    if (name) product.name = name;
+    if (code) product.code = code;
+    if (description !== undefined) product.description = description;
+    if (category) {
+      if (!['kanat', 'kasa'].includes(category)) {
+        return res.status(400).json({ message: 'Geçersiz kategori' });
+      }
+      product.category = category;
+    }
+    if (isActive !== undefined) product.isActive = isActive;
+    
+    await product.save();
     res.json(product);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    console.error('❌ Ürün güncellenirken hata:', error);
+    res.status(400).json({ message: error.message });
   }
 });
 
-// Ürün sil (sadece admin)
-router.delete('/:id', [auth, admin], async (req, res) => {
+// 📌 Ürün sil (soft delete)
+router.delete('/:id', auth, authorize.admin, async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Ürün bulunamadı' });
     }
-
+    
     product.isActive = false;
     await product.save();
-
-    res.json({ message: 'Ürün silindi' });
+    res.json({ message: 'Ürün başarıyla devre dışı bırakıldı' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    console.error('❌ Ürün silinirken hata:', error);
+    res.status(500).json({ message: error.message });
   }
 });
 

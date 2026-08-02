@@ -87,7 +87,6 @@ const Transfer = () => {
 
     setLoading(true);
     try {
-      // Backend'de transfer endpoint'i yoksa, önce çıkış sonra giriş yapalım
       // 1. Kaynak şubeden stok çıkışı
       await axios.post('/stock/out', {
         productId: formData.productId,
@@ -106,7 +105,6 @@ const Transfer = () => {
 
       toast.success(`${quantityNum} adet ürün başarıyla transfer edildi`);
       
-      // Formu temizle
       setFormData({
         productId: '',
         fromBranch: user?.branch || '',
@@ -115,7 +113,6 @@ const Transfer = () => {
         note: ''
       });
       
-      // Verileri yenile
       await fetchData();
       
     } catch (error) {
@@ -126,9 +123,10 @@ const Transfer = () => {
     }
   };
 
+  // ✅ SADECE ÜRÜN ADI - KOD OLMADAN
   const getProductName = (productId) => {
     const product = products.find(p => p._id === productId);
-    return product ? `${product.code} - ${product.name}` : '';
+    return product ? product.name : '';
   };
 
   // Maksimum transfer edilebilecek miktarı göster
@@ -161,7 +159,8 @@ const Transfer = () => {
               <option value="">Ürün seçin</option>
               {products.map(product => (
                 <option key={product._id} value={product._id}>
-                  {product.code} - {product.name}
+                  {/* ✅ SADECE ÜRÜN ADI */}
+                  {product.name}
                 </option>
               ))}
             </select>
@@ -301,7 +300,7 @@ const Transfer = () => {
         </form>
       </div>
 
-      {/* Transfer geçmişi için alan (opsiyonel) */}
+      {/* Transfer kuralları */}
       <div className="card">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Transfer Kuralları</h3>
         <ul className="space-y-2 text-sm text-gray-600">

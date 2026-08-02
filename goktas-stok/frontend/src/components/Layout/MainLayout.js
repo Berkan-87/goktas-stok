@@ -15,8 +15,8 @@ import {
 
 const navigation = [
   { name: 'Ana Sayfa', href: '/', icon: HomeIcon },
-  { name: 'Stok Listesi', href: '/stoklar', icon: CubeIcon },
-  { name: 'Üretim', href: '/uretim', icon: CogIcon },
+  { name: 'Stoklar', href: '/stoklar', icon: CubeIcon },
+  { name: 'Siparişler', href: '/uretim', icon: CogIcon },
   { name: 'Transfer', href: '/transfer', icon: ArrowsRightLeftIcon },
   { name: 'Geçmiş', href: '/gecmis', icon: ClockIcon },
 ];

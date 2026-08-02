@@ -8,7 +8,9 @@ import {
   ClockIcon,
   CheckCircleIcon,
   XMarkIcon,
-  TrashIcon
+  TrashIcon,
+  ChevronDownIcon,
+  ChevronUpIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -16,7 +18,12 @@ import { tr } from 'date-fns/locale';
 const Production = () => {
   const { user } = useSelector((state) => state.auth);
   const [orders, setOrders] = useState([]);
-  const [activeTab, setActiveTab] = useState('planlama');
+  const [expandedSections, setExpandedSections] = useState({
+    production: true,
+    stock: true,
+    sevk: true,
+    completed: true
+  });
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(null);
   const [newOrder, setNewOrder] = useState({
@@ -25,28 +32,37 @@ const Production = () => {
     model: '',
     color: '',
     quantity: '',
-    note: ''
+    note: '',
+    startStage: 'planlama'
   });
   const [loading, setLoading] = useState(false);
 
-  // Aşama tanımları
-  const stages = [
-    { id: 'planlama', label: '📋 Planlamada', icon: '📋', nextStage: 'uretim' },
-    { id: 'uretim', label: '⚙️ Üretimde', icon: '⚙️', nextStage: 'paketleme' },
-    { id: 'paketleme', label: '📦 Paketlemede', icon: '📦', nextStage: 'hazir' },
-    { id: 'hazir', label: '✅ Hazır', icon: '✅', nextStage: 'tamamlandi' },
-    { id: 'tamamlandi', label: '🏁 Tamamlandı', icon: '🏁', nextStage: null }
+  // 🎯 Aşama tanımları - TÜM AŞAMALAR TEK BİR YERDE
+  const allStages = [
+    { id: 'planlama', label: '📋 Planlama', icon: '📋', nextStage: 'uretim' },
+    { id: 'uretim', label: '⚙️ Üretim', icon: '⚙️', nextStage: 'paketleme' },
+    { id: 'paketleme', label: '📦 Paketleme', icon: '📦', nextStage: 'sevk_alani' },
+    { id: 'depo_hazirlik', label: '🏭 Depo Hazırlık', icon: '🏭', nextStage: 'sevk_alani' },
+    { id: 'sevk_alani', label: '🚚 Sevk Alanı', icon: '🚚', nextStage: 'tamamlandi' },
+    { id: 'tamamlandi', label: '✅ Tamamlandı', icon: '✅', nextStage: null }
   ];
+
+  // Bölüm bazında aşamalar
+  const productionStages = allStages.filter(s => ['planlama', 'uretim', 'paketleme'].includes(s.id));
+  const stockStages = allStages.filter(s => ['depo_hazirlik'].includes(s.id));
+  const sevkStages = allStages.filter(s => ['sevk_alani'].includes(s.id));
+  const completedStages = allStages.filter(s => ['tamamlandi'].includes(s.id));
 
   // Kullanıcının yetkili olduğu aşamalar
   const getUserStages = () => {
-    if (user?.role === 'admin') return stages.map(s => s.id);
+    if (user?.role === 'admin') return allStages.map(s => s.id);
     if (user?.role === 'production_manager') {
       const roleStages = {
         'planlama': ['planlama'],
         'uretim': ['uretim'],
         'paketleme': ['paketleme'],
-        'hazir': ['hazir']
+        'depo_hazirlik': ['depo_hazirlik', 'sevk_alani'],
+        'hazir': ['tamamlandi']
       };
       return roleStages[user?.productionRole] || [];
     }
@@ -69,17 +85,16 @@ const Production = () => {
 
   useEffect(() => {
     fetchOrders();
-  }, [activeTab]);
+  }, []);
 
   const fetchOrders = async () => {
     try {
-      console.log('📤 Siparişler isteniyor...', `/production/stage/${activeTab}`);
-      const response = await axios.get(`/production/stage/${activeTab}`);
+      console.log('📤 Tüm siparişler isteniyor...');
+      const response = await axios.get('/production');
       console.log('📥 Gelen siparişler:', response.data);
       setOrders(response.data);
     } catch (error) {
       console.error('❌ Sipariş hatası:', error);
-      console.error('❌ Hata detayı:', error.response?.data);
       toast.error(error.response?.data?.message || 'Siparişler alınamadı');
     }
   };
@@ -88,16 +103,31 @@ const Production = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      await axios.post('/production', {
-        ...newOrder,
-        stage: 'planlama',
-        createdBy: user._id
+      console.log('📤 Sipariş ekleniyor:', newOrder);
+      const response = await axios.post('/production', {
+        orderNo: newOrder.orderNo,
+        customer: newOrder.customer,
+        model: newOrder.model,
+        color: newOrder.color,
+        quantity: parseInt(newOrder.quantity),
+        note: newOrder.note,
+        startStage: newOrder.startStage // Backend bu alanı kullanacak
       });
+      console.log('✅ Sipariş eklendi:', response.data);
       toast.success('Sipariş başarıyla eklendi');
       setShowAddModal(false);
-      setNewOrder({ orderNo: '', customer: '', model: '', color: '', quantity: '', note: '' });
+      setNewOrder({ 
+        orderNo: '', 
+        customer: '', 
+        model: '', 
+        color: '', 
+        quantity: '', 
+        note: '',
+        startStage: 'planlama'
+      });
       fetchOrders();
     } catch (error) {
+      console.error('❌ Sipariş ekleme hatası:', error);
       toast.error(error.response?.data?.message || 'Sipariş eklenemedi');
     } finally {
       setLoading(false);
@@ -115,9 +145,14 @@ const Production = () => {
     }
   };
 
+  // 🎯 DÜZELTİLDİ: handleMoveStage
   const handleMoveStage = async (orderId, currentStage) => {
-    const stage = stages.find(s => s.id === currentStage);
-    if (!stage || !stage.nextStage) return;
+    // currentStage'e göre nextStage'i bul
+    const stage = allStages.find(s => s.id === currentStage);
+    if (!stage || !stage.nextStage) {
+      toast.error('Sipariş zaten son aşamada!');
+      return;
+    }
 
     if (!canManageStage(currentStage)) {
       toast.error('Bu aşamada yetkiniz yok');
@@ -125,13 +160,16 @@ const Production = () => {
     }
 
     try {
-      await axios.put(`/production/${orderId}/stage`, {
+      console.log(`📤 Sipariş ${currentStage} -> ${stage.nextStage} taşınıyor...`);
+      await axios.put(`/production/${orderId}`, {
         stage: stage.nextStage
       });
-      toast.success('Sipariş ileri taşındı');
+      const nextStageLabel = allStages.find(s => s.id === stage.nextStage)?.label || stage.nextStage;
+      toast.success(`Sipariş ${nextStageLabel} aşamasına taşındı`);
       fetchOrders();
     } catch (error) {
-      toast.error('İşlem başarısız');
+      console.error('❌ Taşıma hatası:', error.response?.data || error);
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
     }
   };
 
@@ -154,35 +192,52 @@ const Production = () => {
     return `${diffHours} saat ${diffMinutes} dakika`;
   };
 
-  const canAdd = activeTab === 'planlama' && canManageStage('planlama');
+  const getOrdersByStage = (stageId) => {
+    return orders.filter(order => order.stage === stageId);
+  };
+
+  const toggleSection = (section) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const canAdd = user?.role === 'admin' || user?.role === 'branch_manager' || user?.productionRole === 'planlama';
 
   // ✅ Mobil Kart Bileşeni
-  const MobileOrderCard = ({ order }) => {
+  const MobileOrderCard = ({ order, stageId }) => {
     const showDelete = canDelete(order.stage);
-    const showMove = activeTab !== 'tamamlandi' && canManageStage(activeTab);
+    const showMove = stageId !== 'tamamlandi' && canManageStage(stageId);
+    const isCompleted = order.stage === 'tamamlandi';
+    const isSevk = order.stage === 'sevk_alani';
 
     return (
       <div className="bg-white rounded-lg shadow-sm p-3 mb-2 border border-gray-100 hover:shadow-md transition-all duration-200">
-        {/* Üst Satır: Sipariş No, Durum ve İşlemler */}
         <div className="flex items-center justify-between mb-1.5">
           <div className="flex items-center gap-2">
             <span className="font-bold text-blue-600 text-sm">#{order.orderNo}</span>
             <span className="text-[10px] font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
-              {stages.find(s => s.id === order.stage)?.label || order.stage}
+              {allStages.find(s => s.id === order.stage)?.label || order.stage}
             </span>
           </div>
           <div className="flex gap-0.5">
-            {showMove && (
+            {showMove && !isCompleted && (
               <button
-                onClick={() => handleMoveStage(order._id, activeTab)}
+                onClick={() => handleMoveStage(order._id, stageId)}
                 className="p-1 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
                 title="İleri Taşı"
               >
                 <ArrowRightIcon className="h-3.5 w-3.5" />
               </button>
             )}
-            {activeTab === 'tamamlandi' && !showDelete && (
+            {isCompleted && (
               <CheckCircleIcon className="h-4 w-4 text-green-500" />
+            )}
+            {isSevk && !isCompleted && (
+              <span className="text-[10px] bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">
+                Sevk Bekliyor
+              </span>
             )}
             {showDelete && (
               <button
@@ -200,7 +255,6 @@ const Production = () => {
           </div>
         </div>
 
-        {/* Orta Satır: Müşteri - Model - Adet */}
         <div className="flex items-center gap-2 text-sm mb-1.5">
           <span className="font-medium text-gray-800 truncate flex-1">{order.customer}</span>
           <span className="text-gray-400">•</span>
@@ -209,21 +263,18 @@ const Production = () => {
           <span className="font-semibold text-gray-900">{order.quantity} adet</span>
         </div>
 
-        {/* Alt Satır: Renk - Süre - Aşama Zamanı */}
         <div className="flex items-center justify-between text-xs text-gray-500 border-t border-gray-50 pt-1.5">
           <div className="flex items-center gap-1.5">
             <span 
               className="w-2.5 h-2.5 rounded-full border border-gray-200 flex-shrink-0" 
               style={{ 
-                backgroundColor: order.color.toLowerCase().includes('beyaz') ? '#f5f5f5' :
-                              order.color.toLowerCase().includes('siyah') ? '#1a1a1a' :
-                              order.color.toLowerCase().includes('kırmızı') ? '#dc2626' :
-                              order.color.toLowerCase().includes('mavi') ? '#2563eb' :
-                              order.color.toLowerCase().includes('yeşil') ? '#16a34a' :
-                              order.color.toLowerCase().includes('sarı') ? '#eab308' :
-                              order.color.toLowerCase().includes('gri') ? '#6b7280' :
-                              order.color.toLowerCase().includes('lacivert') ? '#1e3a8a' :
-                              order.color.toLowerCase().includes('bordo') ? '#7f1d1d' :
+                backgroundColor: order.color?.toLowerCase().includes('beyaz') ? '#f5f5f5' :
+                              order.color?.toLowerCase().includes('siyah') ? '#1a1a1a' :
+                              order.color?.toLowerCase().includes('kırmızı') ? '#dc2626' :
+                              order.color?.toLowerCase().includes('mavi') ? '#2563eb' :
+                              order.color?.toLowerCase().includes('yeşil') ? '#16a34a' :
+                              order.color?.toLowerCase().includes('sarı') ? '#eab308' :
+                              order.color?.toLowerCase().includes('gri') ? '#6b7280' :
                               '#9ca3af'
               }}
             />
@@ -239,173 +290,211 @@ const Production = () => {
         </div>
       </div>
     );
-  }; // ✅ Buraya dikkat! MobileOrderCard burada kapanıyor
+  };
+
+  // Stage kartı render'ı
+  const renderStageColumn = (stage, sectionType = 'production') => {
+    const stageOrders = getOrdersByStage(stage.id);
+    
+    let bgColor, borderColor, headerBg;
+    if (sectionType === 'production') {
+      bgColor = 'bg-blue-50';
+      borderColor = 'border-blue-200';
+      headerBg = 'bg-blue-100';
+    } else if (sectionType === 'stock') {
+      bgColor = 'bg-indigo-50';
+      borderColor = 'border-indigo-200';
+      headerBg = 'bg-indigo-100';
+    } else if (sectionType === 'sevk') {
+      bgColor = 'bg-orange-50';
+      borderColor = 'border-orange-200';
+      headerBg = 'bg-orange-100';
+    } else {
+      bgColor = 'bg-green-50';
+      borderColor = 'border-green-200';
+      headerBg = 'bg-green-100';
+    }
+
+    return (
+      <div key={stage.id} className="flex-1 min-w-[200px]">
+        <div className={`${bgColor} rounded-xl p-3 h-full`}>
+          <div className={`${headerBg} rounded-lg p-2 mb-3 border ${borderColor}`}>
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-sm text-gray-800">
+                {stage.icon} {stage.label}
+              </h3>
+              <span className="text-xs font-semibold bg-white px-2 py-0.5 rounded-full shadow-sm">
+                {stageOrders.length}
+              </span>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {stageOrders.length === 0 ? (
+              <div className="text-center text-gray-400 py-6 bg-white rounded-lg border-2 border-dashed border-gray-200 text-xs">
+                Sipariş yok
+              </div>
+            ) : (
+              stageOrders.map((order) => (
+                <MobileOrderCard key={order._id} order={order} stageId={stage.id} />
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="space-y-4 sm:space-y-6 w-full">
-      {/* Başlık ve Buton Alanı */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-gray-900">🏭 Üretim Takibi</h1>
-          <p className="text-sm text-gray-600 mt-1 hidden sm:block">Siparişlerin üretim sürecini takip edin</p>
+    <div className="space-y-4 sm:space-y-6 w-full max-w-7xl mx-auto p-2 sm:p-4">
+      {/* GELEN SİPARİŞ */}
+      <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 sm:p-6 border-2 border-green-300 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-green-800 flex items-center gap-2">
+              📦 GELEN SİPARİŞ
+            </h2>
+            <p className="text-green-600 text-sm mt-1">
+              Toplam: {orders.length} aktif sipariş
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <span className="bg-blue-200 text-blue-800 px-3 py-1.5 rounded-lg font-semibold text-sm">
+              📋 Planlamada: {getOrdersByStage('planlama').length}
+            </span>
+            <span className="bg-indigo-200 text-indigo-800 px-3 py-1.5 rounded-lg font-semibold text-sm">
+              🏭 Depo Hazırlık: {getOrdersByStage('depo_hazirlik').length}
+            </span>
+            {canAdd && (
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="bg-blue-600 text-white px-4 py-1.5 rounded-lg hover:bg-blue-700 transition flex items-center gap-2 text-sm shadow-md"
+              >
+                <PlusIcon className="h-4 w-4" />
+                Yeni Sipariş Ekle
+              </button>
+            )}
+          </div>
         </div>
-        {canAdd && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="btn-primary flex items-center justify-center gap-2 w-full sm:w-auto"
-          >
-            <PlusIcon className="h-5 w-5" />
-            <span>Yeni Sipariş Ekle</span>
+      </div>
+
+      {/* ÜRETİM BÖLÜMÜ */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div 
+          className="bg-gradient-to-r from-blue-50 to-indigo-50 p-3 sm:p-4 cursor-pointer flex justify-between items-center border-b-2 border-blue-200 hover:bg-blue-100 transition"
+          onClick={() => toggleSection('production')}
+        >
+          <h2 className="text-lg sm:text-xl font-bold text-blue-800 flex items-center gap-2">
+            🏭 ÜRETİM BÖLÜMÜ
+            <span className="text-sm font-normal text-blue-600 bg-blue-200 px-2 py-0.5 rounded-full">
+              {productionStages.reduce((total, stage) => total + getOrdersByStage(stage.id).length, 0)}
+            </span>
+          </h2>
+          <button className="text-blue-600 p-1">
+            {expandedSections.production ? 
+              <ChevronUpIcon className="h-5 w-5" /> : 
+              <ChevronDownIcon className="h-5 w-5" />
+            }
           </button>
+        </div>
+
+        {expandedSections.production && (
+          <div className="p-3 sm:p-4 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 min-w-[280px]">
+              {productionStages.map(stage => renderStageColumn(stage, 'production'))}
+            </div>
+          </div>
         )}
       </div>
 
-      {/* ✅ Aşama Sekmeleri - Mobilde Dikey */}
-      <div className="flex flex-col sm:flex-row gap-2 pb-2">
-        {stages.map((stage) => {
-          const count = orders.filter(o => o.stage === stage.id).length;
-          return (
-            <button
-              key={stage.id}
-              onClick={() => setActiveTab(stage.id)}
-              className={`
-                px-3 py-2.5 sm:px-4 sm:py-2.5 rounded-lg font-medium transition-all text-xs sm:text-sm
-                w-full sm:flex-1 text-left sm:text-center flex justify-between sm:justify-center items-center gap-2
-                ${activeTab === stage.id 
-                  ? 'bg-blue-600 text-white shadow-lg' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}
-              `}
-            >
-              <div className="flex items-center gap-2">
-                <span>{stage.icon}</span>
-                <span>{stage.label.replace(stage.icon, '').trim()}</span>
-              </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${
-                activeTab === stage.id ? 'bg-blue-700' : 'bg-gray-200'
-              }`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ✅ Sipariş Listesi - Mobilde Kart, Masaüstünde Tablo */}
-      <div className="card overflow-hidden">
-        {/* Masaüstü Tablosu (md ve üzeri) */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Sip. No</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Cari</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Model</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Renk</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700 text-sm">Adet</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700 text-sm">Bu Aşamada</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700 text-sm">Süre</th>
-                <th className="text-center py-3 px-4 font-semibold text-gray-700 text-sm">İşlem</th>
-              </tr>
-            </thead>
-            <tbody>
-              {orders.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="text-center py-8 text-gray-500 text-sm">
-                    Bu aşamada sipariş bulunmuyor
-                  </td>
-                </tr>
-              ) : (
-                orders.map((order) => {
-                  const showDelete = canDelete(order.stage);
-                  const showMove = activeTab !== 'tamamlandi' && canManageStage(activeTab);
-                  
-                  return (
-                    <tr key={order._id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-3 px-4 font-mono text-sm font-bold">{order.orderNo}</td>
-                      <td className="py-3 px-4 text-sm">{order.customer}</td>
-                      <td className="py-3 px-4 text-sm">{order.model}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <span 
-                            className="w-3 h-3 rounded-full border border-gray-300 flex-shrink-0" 
-                            style={{ 
-                              backgroundColor: order.color.toLowerCase().includes('beyaz') ? '#f5f5f5' :
-                                            order.color.toLowerCase().includes('siyah') ? '#1a1a1a' :
-                                            order.color.toLowerCase().includes('kırmızı') ? '#dc2626' :
-                                            order.color.toLowerCase().includes('mavi') ? '#2563eb' :
-                                            order.color.toLowerCase().includes('yeşil') ? '#16a34a' :
-                                            order.color.toLowerCase().includes('sarı') ? '#eab308' :
-                                            order.color.toLowerCase().includes('gri') ? '#6b7280' :
-                                            '#9ca3af'
-                            }}
-                          />
-                          <span className="text-sm">{order.color}</span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-center font-semibold text-sm">{order.quantity}</td>
-                      <td className="py-3 px-4 text-sm">
-                        {formatDate(order.stageHistory?.[order.stage]?.startedAt)}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex items-center justify-center gap-1 text-sm">
-                          <ClockIcon className="h-4 w-4 text-gray-400" />
-                          <span className="font-mono">
-                            {calculateDuration(order.stageHistory?.[order.stage]?.startedAt)}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <div className="flex justify-center gap-2">
-                          {showMove && (
-                            <button
-                              onClick={() => handleMoveStage(order._id, activeTab)}
-                              className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition-colors"
-                              title="İleri Taşı"
-                            >
-                              <ArrowRightIcon className="h-5 w-5" />
-                            </button>
-                          )}
-                          {activeTab === 'tamamlandi' && !showDelete && (
-                            <CheckCircleIcon className="h-5 w-5 text-green-600" />
-                          )}
-                          {showDelete && (
-                            <button
-                              onClick={() => setShowDeleteModal({
-                                id: order._id,
-                                orderNo: order.orderNo,
-                                customer: order.customer
-                              })}
-                              className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                              title="Siparişi Sil"
-                            >
-                              <TrashIcon className="h-5 w-5" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+      {/* STOK BÖLÜMÜ */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div 
+          className="bg-gradient-to-r from-indigo-50 to-purple-50 p-3 sm:p-4 cursor-pointer flex justify-between items-center border-b-2 border-indigo-200 hover:bg-indigo-100 transition"
+          onClick={() => toggleSection('stock')}
+        >
+          <h2 className="text-lg sm:text-xl font-bold text-indigo-800 flex items-center gap-2">
+            📦 STOK BÖLÜMÜ
+            <span className="text-sm font-normal text-indigo-600 bg-indigo-200 px-2 py-0.5 rounded-full">
+              {stockStages.reduce((total, stage) => total + getOrdersByStage(stage.id).length, 0)}
+            </span>
+          </h2>
+          <button className="text-indigo-600 p-1">
+            {expandedSections.stock ? 
+              <ChevronUpIcon className="h-5 w-5" /> : 
+              <ChevronDownIcon className="h-5 w-5" />
+            }
+          </button>
         </div>
 
-        {/* Mobil Kart Görünümü (md altı) */}
-        <div className="md:hidden p-2">
-          {orders.length === 0 ? (
-            <div className="text-center py-8 text-gray-500 text-sm">
-              Bu aşamada sipariş bulunmuyor
+        {expandedSections.stock && (
+          <div className="p-3 sm:p-4 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 min-w-[280px]">
+              {stockStages.map(stage => renderStageColumn(stage, 'stock'))}
             </div>
-          ) : (
-            orders.map((order) => (
-              <MobileOrderCard key={order._id} order={order} />
-            ))
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Silme Onay Modalı */}
+      {/* SEVK ALANI */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div 
+          className="bg-gradient-to-r from-orange-50 to-amber-50 p-3 sm:p-4 cursor-pointer flex justify-between items-center border-b-2 border-orange-200 hover:bg-orange-100 transition"
+          onClick={() => toggleSection('sevk')}
+        >
+          <h2 className="text-lg sm:text-xl font-bold text-orange-800 flex items-center gap-2">
+            🚚 SEVK ALANI
+            <span className="text-sm font-normal text-orange-600 bg-orange-200 px-2 py-0.5 rounded-full">
+              {getOrdersByStage('sevk_alani').length}
+            </span>
+          </h2>
+          <button className="text-orange-600 p-1">
+            {expandedSections.sevk ? 
+              <ChevronUpIcon className="h-5 w-5" /> : 
+              <ChevronDownIcon className="h-5 w-5" />
+            }
+          </button>
+        </div>
+
+        {expandedSections.sevk && (
+          <div className="p-3 sm:p-4 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 min-w-[280px]">
+              {sevkStages.map(stage => renderStageColumn(stage, 'sevk'))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* TAMAMLANAN SİPARİŞLER */}
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+        <div 
+          className="bg-gradient-to-r from-green-50 to-emerald-50 p-3 sm:p-4 cursor-pointer flex justify-between items-center border-b-2 border-green-200 hover:bg-green-100 transition"
+          onClick={() => toggleSection('completed')}
+        >
+          <h2 className="text-lg sm:text-xl font-bold text-green-800 flex items-center gap-2">
+            ✅ TAMAMLANAN SİPARİŞLER
+            <span className="text-sm font-normal text-green-600 bg-green-200 px-2 py-0.5 rounded-full">
+              {getOrdersByStage('tamamlandi').length}
+            </span>
+          </h2>
+          <button className="text-green-600 p-1">
+            {expandedSections.completed ? 
+              <ChevronUpIcon className="h-5 w-5" /> : 
+              <ChevronDownIcon className="h-5 w-5" />
+            }
+          </button>
+        </div>
+
+        {expandedSections.completed && (
+          <div className="p-3 sm:p-4 overflow-x-auto">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 min-w-[280px]">
+              {completedStages.map(stage => renderStageColumn(stage, 'completed'))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Silme Modalı */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -427,13 +516,13 @@ const Production = () => {
             <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={() => handleDeleteOrder(showDeleteModal.id)}
-                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors"
+                className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors text-sm"
               >
                 Evet, Sil
               </button>
               <button
                 onClick={() => setShowDeleteModal(null)}
-                className="flex-1 btn-secondary"
+                className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition-colors text-sm"
               >
                 İptal
               </button>
@@ -447,7 +536,7 @@ const Production = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-2xl w-full mx-auto max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg sm:text-xl font-bold">Yeni Sipariş Ekle</h2>
+              <h2 className="text-lg sm:text-xl font-bold">📦 Yeni Sipariş Ekle</h2>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="p-1 hover:bg-gray-100 rounded"
@@ -466,7 +555,7 @@ const Production = () => {
                     type="text"
                     value={newOrder.orderNo}
                     onChange={(e) => setNewOrder({ ...newOrder, orderNo: e.target.value })}
-                    className="input-field"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     placeholder="Örn: 41191"
                     required
                   />
@@ -479,7 +568,7 @@ const Production = () => {
                     type="text"
                     value={newOrder.customer}
                     onChange={(e) => setNewOrder({ ...newOrder, customer: e.target.value })}
-                    className="input-field"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     placeholder="Cüneyt Bekki"
                     required
                   />
@@ -495,7 +584,7 @@ const Production = () => {
                     type="text"
                     value={newOrder.model}
                     onChange={(e) => setNewOrder({ ...newOrder, model: e.target.value })}
-                    className="input-field"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     placeholder="606"
                     required
                   />
@@ -508,26 +597,45 @@ const Production = () => {
                     type="text"
                     value={newOrder.color}
                     onChange={(e) => setNewOrder({ ...newOrder, color: e.target.value })}
-                    className="input-field"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                     placeholder="LAKE MÜŞTERİ RENKİ"
                     required
                   />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Adet *
-                </label>
-                <input
-                  type="number"
-                  value={newOrder.quantity}
-                  onChange={(e) => setNewOrder({ ...newOrder, quantity: e.target.value })}
-                  className="input-field"
-                  placeholder="16"
-                  min="1"
-                  required
-                />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Adet *
+                  </label>
+                  <input
+                    type="number"
+                    value={newOrder.quantity}
+                    onChange={(e) => setNewOrder({ ...newOrder, quantity: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    placeholder="16"
+                    min="1"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Başlangıç Aşaması *
+                  </label>
+                  <select
+                    value={newOrder.startStage}
+                    onChange={(e) => setNewOrder({ ...newOrder, startStage: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    required
+                  >
+                    <option value="planlama">📋 Planlama (Üretim Bölümü)</option>
+                    <option value="depo_hazirlik">🏭 Depo Hazırlık (Stok Bölümü)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Siparişi doğrudan hangi bölüme eklemek istersiniz?
+                  </p>
+                </div>
               </div>
 
               <div>
@@ -537,20 +645,20 @@ const Production = () => {
                 <textarea
                   value={newOrder.note}
                   onChange={(e) => setNewOrder({ ...newOrder, note: e.target.value })}
-                  className="input-field"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
                   rows="2"
                   placeholder="Siparişle ilgili notlar..."
                 />
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                <button type="submit" className="flex-1 btn-primary" disabled={loading}>
+                <button type="submit" className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition text-sm" disabled={loading}>
                   {loading ? 'Ekleniyor...' : 'Sipariş Ekle'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 btn-secondary"
+                  className="flex-1 bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300 transition text-sm"
                 >
                   İptal
                 </button>
