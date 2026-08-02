@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
+const Stock = require('../models/Stock');
 const auth = require('../middleware/auth');
 const authorize = require('../middleware/authorize');
 
@@ -15,14 +16,12 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// 📌 Yeni ürün ekle - DÜZELTİLDİ
+// 📌 Yeni ürün ekle - OTOMATİK STOK OLUŞTUR
 router.post('/', auth, authorize.admin, async (req, res) => {
   try {
     console.log('📥 Yeni ürün isteği:', req.body);
     
     const { code, name, description, unit, category } = req.body;
-    
-    // Kategori kontrolü - varsayılan 'kanat'
     const productCategory = category || 'kanat';
     
     // Geçerli kategori mi kontrol et
@@ -32,6 +31,7 @@ router.post('/', auth, authorize.admin, async (req, res) => {
       });
     }
     
+    // Ürünü oluştur
     const product = new Product({
       code,
       name,
@@ -43,6 +43,19 @@ router.post('/', auth, authorize.admin, async (req, res) => {
     
     await product.save();
     console.log('✅ Ürün eklendi:', product);
+    
+    // ✅ TÜM ŞUBELER İÇİN STOK KAYDI OLUŞTUR
+    const branches = ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka'];
+    const stockEntries = branches.map(branch => ({
+      productId: product._id,
+      branch,
+      quantity: 0, // Başlangıçta 0 stok
+      criticalLevel: 10
+    }));
+    
+    await Stock.insertMany(stockEntries);
+    console.log(`✅ ${branches.length} şube için stok kaydı oluşturuldu`);
+    
     res.status(201).json(product);
   } catch (error) {
     console.error('❌ Ürün eklenirken hata:', error);

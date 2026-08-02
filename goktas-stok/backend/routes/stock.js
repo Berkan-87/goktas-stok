@@ -10,7 +10,7 @@ const { canModifyBranch } = require('../middleware/authorize');
 // Tüm şubelerin stoklarını getir
 router.get('/', auth, async (req, res) => {
   try {
-    const stocks = await Stock.find().populate('productId', 'code name isActive');
+    const stocks = await Stock.find().populate('productId', 'code name isActive category');
     res.json(stocks);
   } catch (error) {
     console.error(error);
@@ -22,7 +22,7 @@ router.get('/', auth, async (req, res) => {
 router.get('/branch/:branch', auth, async (req, res) => {
   try {
     const { branch } = req.params;
-    const stocks = await Stock.find({ branch }).populate('productId', 'code name isActive');
+    const stocks = await Stock.find({ branch }).populate('productId', 'code name isActive category');
     res.json(stocks);
   } catch (error) {
     console.error(error);
@@ -30,7 +30,7 @@ router.get('/branch/:branch', auth, async (req, res) => {
   }
 });
 
-// Stok girişi
+// 📌 Stok girişi - OTOMATİK STOK KAYDI OLUŞTUR
 router.post('/in', [
   auth,
   canModifyBranch(req => req.body.branch)
@@ -54,13 +54,22 @@ router.post('/in', [
       return res.status(404).json({ message: 'Ürün bulunamadı veya pasif' });
     }
     
-    const stock = await Stock.findOne({ productId, branch });
+    // ✅ Stok kaydını bul, yoksa oluştur
+    let stock = await Stock.findOne({ productId, branch });
     if (!stock) {
-      return res.status(404).json({ message: 'Stok kaydı bulunamadı' });
+      console.log(`📦 Stok kaydı bulunamadı, oluşturuluyor: ${product.name} - ${branch}`);
+      stock = new Stock({
+        productId,
+        branch,
+        quantity: 0,
+        criticalLevel: 10
+      });
+      await stock.save();
+      console.log('✅ Yeni stok kaydı oluşturuldu:', stock);
     }
 
     const previousQuantity = stock.quantity;
-    stock.quantity += quantity;
+    stock.quantity += parseInt(quantity);
     stock.updatedAt = Date.now();
     await stock.save();
 
@@ -69,11 +78,11 @@ router.post('/in', [
       type: 'in',
       productId,
       toBranch: branch,
-      quantity,
+      quantity: parseInt(quantity),
       previousQuantity,
       newQuantity: stock.quantity,
       user: req.user._id,
-      note
+      note: note || 'Stok girişi'
     });
     await transaction.save();
 
@@ -83,12 +92,12 @@ router.post('/in', [
       transaction
     });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    console.error('❌ Stok girişi hatası:', error);
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });
 
-// Stok çıkışı
+// 📌 Stok çıkışı - OTOMATİK STOK KAYDI OLUŞTUR
 router.post('/out', [
   auth,
   canModifyBranch(req => req.body.branch)
@@ -112,17 +121,28 @@ router.post('/out', [
       return res.status(404).json({ message: 'Ürün bulunamadı veya pasif' });
     }
     
-    const stock = await Stock.findOne({ productId, branch });
+    // ✅ Stok kaydını bul, yoksa oluştur (0 stokla)
+    let stock = await Stock.findOne({ productId, branch });
     if (!stock) {
-      return res.status(404).json({ message: 'Stok kaydı bulunamadı' });
+      console.log(`📦 Stok kaydı bulunamadı, oluşturuluyor: ${product.name} - ${branch}`);
+      stock = new Stock({
+        productId,
+        branch,
+        quantity: 0,
+        criticalLevel: 10
+      });
+      await stock.save();
+      console.log('✅ Yeni stok kaydı oluşturuldu:', stock);
     }
 
-    if (stock.quantity < quantity) {
-      return res.status(400).json({ message: 'Yeterli stok bulunmamaktadır' });
+    if (stock.quantity < parseInt(quantity)) {
+      return res.status(400).json({ 
+        message: `Yeterli stok bulunmamaktadır. Mevcut stok: ${stock.quantity}` 
+      });
     }
 
     const previousQuantity = stock.quantity;
-    stock.quantity -= quantity;
+    stock.quantity -= parseInt(quantity);
     stock.updatedAt = Date.now();
     await stock.save();
 
@@ -131,11 +151,11 @@ router.post('/out', [
       type: 'out',
       productId,
       fromBranch: branch,
-      quantity,
+      quantity: parseInt(quantity),
       previousQuantity,
       newQuantity: stock.quantity,
       user: req.user._id,
-      note
+      note: note || 'Stok çıkışı'
     });
     await transaction.save();
 
@@ -145,7 +165,49 @@ router.post('/out', [
       transaction
     });
   } catch (error) {
-    console.error(error);
+    console.error('❌ Stok çıkışı hatası:', error);
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+  }
+});
+
+// 📌 Belirli bir ürünün tüm şubelerdeki stoklarını getir
+router.get('/product/:productId', auth, async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const stocks = await Stock.find({ productId })
+      .populate('productId', 'code name isActive category')
+      .sort({ branch: 1 });
+    res.json(stocks);
+  } catch (error) {
+    console.error('❌ Ürün stokları getirilirken hata:', error);
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
+// 📌 Tüm stokları özet olarak getir (admin için)
+router.get('/summary', auth, async (req, res) => {
+  try {
+    const stocks = await Stock.find()
+      .populate('productId', 'code name category')
+      .sort({ branch: 1, 'productId.name': 1 });
+    
+    // Şube bazında grupla
+    const summary = {};
+    stocks.forEach(stock => {
+      if (!summary[stock.branch]) {
+        summary[stock.branch] = [];
+      }
+      summary[stock.branch].push({
+        productName: stock.productId?.name || 'Bilinmeyen',
+        productCode: stock.productId?.code || '',
+        quantity: stock.quantity,
+        criticalLevel: stock.criticalLevel
+      });
+    });
+    
+    res.json(summary);
+  } catch (error) {
+    console.error('❌ Stok özeti getirilirken hata:', error);
     res.status(500).json({ message: 'Sunucu hatası' });
   }
 });
