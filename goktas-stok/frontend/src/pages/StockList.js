@@ -23,10 +23,11 @@ const StockList = () => {
   const [newProduct, setNewProduct] = useState({ code: '', name: '', description: '', category: 'kanat' });
   const [modalData, setModalData] = useState({ show: false, type: '', productId: '', branch: '', currentStock: 0 });
   const [editingProduct, setEditingProduct] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', code: '', description: '' });
+  const [editForm, setEditForm] = useState({ name: '', code: '', description: '', category: '' });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [activeTab, setActiveTab] = useState('kanat');
+  const [loading, setLoading] = useState(true);
 
   // 🎯 Kasa Takım renkleri
   const kasaColors = [
@@ -75,6 +76,7 @@ const StockList = () => {
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       const [stocksRes, productsRes] = await Promise.all([
         axios.get(`/stock/branch/${selectedBranch}`),
         axios.get('/products')
@@ -83,6 +85,8 @@ const StockList = () => {
       setProducts(productsRes.data);
     } catch (error) {
       toast.error('Veriler alınamadı');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -209,7 +213,7 @@ const StockList = () => {
     return groups;
   };
 
-  // ✅ Kasa Takım renklerine göre grupla
+  // ✅ Kasa Takım renklerine göre grupla - GELİŞTİRİLMİŞ (ÇOK ESNEK)
   const groupProductsByKasaColor = () => {
     const filteredProducts = products.filter(p => p.category === 'kasa');
     const groups = {};
@@ -222,21 +226,31 @@ const StockList = () => {
     // "Diğer" grubunu ekle
     groups['Diğer'] = [];
 
+    // 🎯 Renk eşleştirme anahtarları (ÇOK ESNEK)
+    const colorKeys = {
+      'Bute Beyaz': ['bute beyaz', 'beyaz', 'bute', 'bb', 'bey'],
+      'Koyu Gri': ['koyu gri', 'koyu', 'kg', 'gri koyu'],
+      'Açık Gri': ['açık gri', 'açık', 'acik', 'ag', 'gri açık', 'acik gri'],
+      'Taş Gri': ['taş gri', 'tas gri', 'tas', 'tg', 'gri taş']
+    };
+
     // Ürünleri renklerine göre doldur
     filteredProducts.forEach(product => {
       const productName = product.name.toLowerCase();
+      const productCode = product.code?.toLowerCase() || '';
       let assigned = false;
       
-      for (const color of kasaColors) {
-        const colorLabel = color.label.toLowerCase();
-        const colorId = color.id.toLowerCase().replace(/_/g, ' ');
-        
-        // Ürün adında renk adı veya ID varsa eşleştir
-        if (productName.includes(colorLabel) || productName.includes(colorId)) {
-          groups[color.label].push(product);
-          assigned = true;
-          break;
+      for (const [colorLabel, keys] of Object.entries(colorKeys)) {
+        for (const key of keys) {
+          if (productName.includes(key) || productCode.includes(key)) {
+            if (groups[colorLabel]) {
+              groups[colorLabel].push(product);
+              assigned = true;
+              break;
+            }
+          }
         }
+        if (assigned) break;
       }
       
       // Eğer hiçbir renkle eşleşmediyse "Diğer" grubuna ekle
@@ -532,6 +546,18 @@ const StockList = () => {
   // 📊 Toplam sayılar
   const kanatCount = products.filter(p => p.category === 'kanat').length;
   const kasaCount = products.filter(p => p.category === 'kasa').length;
+
+  // ✅ Loading kontrolü
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-500">Stoklar yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 sm:space-y-6">
