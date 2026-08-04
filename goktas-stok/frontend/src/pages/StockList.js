@@ -20,21 +20,21 @@ const StockList = () => {
   const [products, setProducts] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(user?.branch || 'fabrika');
   const [showAddProduct, setShowAddProduct] = useState(false);
-  const [newProduct, setNewProduct] = useState({ code: '', name: '', description: '', category: 'kanat', color: '' });
+  const [newProduct, setNewProduct] = useState({ code: '', name: '', description: '', category: 'kanat' });
   const [modalData, setModalData] = useState({ show: false, type: '', productId: '', branch: '', currentStock: 0 });
   const [editingProduct, setEditingProduct] = useState(null);
-  const [editForm, setEditForm] = useState({ name: '', code: '', description: '', category: '', color: '' });
+  const [editForm, setEditForm] = useState({ name: '', code: '', description: '', category: '' });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [activeTab, setActiveTab] = useState('kanat');
   const [loading, setLoading] = useState(true);
 
-  // 🎯 Kasa Takım renkleri - SADECE 4 RENK
+  // 🎯 Kasa Takım renkleri
   const kasaColors = [
-    { id: 'bute_beyaz', label: 'Bute Beyaz', color: '#f3f4f6', textColor: '#1f2937', emoji: '⚪' },
-    { id: 'koyu_gri', label: 'Koyu Gri', color: '#4b5563', textColor: '#ffffff', emoji: '⚫' },
-    { id: 'acik_gri', label: 'Açık Gri', color: '#e5e7eb', textColor: '#1f2937', emoji: '🔘' },
-    { id: 'tas_gri', label: 'Taş Gri', color: '#6b7280', textColor: '#ffffff', emoji: '🪨' }
+    { id: 'bute_beyaz', label: 'Bute Beyaz', color: '#f3f4f6', textColor: '#1f2937', emoji: '⚪', keywords: ['bute', 'beyaz', 'bb'] },
+    { id: 'koyu_gri', label: 'Koyu Gri', color: '#4b5563', textColor: '#ffffff', emoji: '⚫', keywords: ['koyu', 'kg'] },
+    { id: 'acik_gri', label: 'Açık Gri', color: '#e5e7eb', textColor: '#1f2937', emoji: '🔘', keywords: ['açık', 'acik', 'ag'] },
+    { id: 'tas_gri', label: 'Taş Gri', color: '#6b7280', textColor: '#ffffff', emoji: '🪨', keywords: ['taş', 'tas', 'tg'] }
   ];
 
   const branches = [
@@ -102,28 +102,19 @@ const StockList = () => {
       return;
     }
 
-    // Kasa kategorisi için renk kontrolü
-    if (newProduct.category === 'kasa' && !newProduct.color) {
-      toast.error('Kasa takım için renk seçmelisiniz');
-      return;
-    }
-
     try {
-      const productData = {
+      console.log('📤 Yeni ürün gönderiliyor:', newProduct);
+      const response = await axios.post('/products', {
         code: newProduct.code,
         name: newProduct.name,
         description: newProduct.description,
         unit: 'adet',
-        category: newProduct.category,
-        color: newProduct.color // Renk bilgisini ekle
-      };
-      
-      console.log('📤 Yeni ürün gönderiliyor:', productData);
-      const response = await axios.post('/products', productData);
+        category: newProduct.category
+      });
       console.log('✅ Ürün eklendi:', response.data);
       toast.success(`${newProduct.name} modeli başarıyla eklendi`);
       setShowAddProduct(false);
-      setNewProduct({ code: '', name: '', description: '', category: 'kanat', color: '' });
+      setNewProduct({ code: '', name: '', description: '', category: 'kanat' });
       fetchData();
     } catch (error) {
       console.error('❌ Ürün ekleme hatası:', error);
@@ -146,22 +137,15 @@ const StockList = () => {
   const handleEditProduct = async (e) => {
     e.preventDefault();
     try {
-      const updateData = {
+      await axios.put(`/products/${editingProduct._id}`, {
         name: editForm.name,
         code: editForm.code,
         description: editForm.description,
         category: editForm.category || editingProduct.category
-      };
-      
-      // Kasa kategorisi için renk ekle
-      if (editForm.category === 'kasa' && editForm.color) {
-        updateData.color = editForm.color;
-      }
-      
-      await axios.put(`/products/${editingProduct._id}`, updateData);
+      });
       toast.success('Ürün başarıyla güncellendi');
       setEditingProduct(null);
-      setEditForm({ name: '', code: '', description: '', category: '', color: '' });
+      setEditForm({ name: '', code: '', description: '', category: '' });
       fetchData();
     } catch (error) {
       toast.error('Ürün güncellenemedi');
@@ -192,6 +176,31 @@ const StockList = () => {
     return Math.min(percentage, 100);
   };
 
+  // ✅ Ürünün rengini bul (ÜRÜN ADINA GÖRE)
+  const getProductColor = (product) => {
+    const name = product.name.toLowerCase();
+    const code = product.code?.toLowerCase() || '';
+    
+    // Önce Taş Gri kontrol et (en spesifik)
+    if (name.includes('taş') || name.includes('tas') || name.includes('tg')) {
+      return 'tas_gri';
+    }
+    // Sonra Koyu Gri
+    if (name.includes('koyu') || name.includes('kg')) {
+      return 'koyu_gri';
+    }
+    // Sonra Açık Gri
+    if (name.includes('açık') || name.includes('acik') || name.includes('ag')) {
+      return 'acik_gri';
+    }
+    // Sonra Bute Beyaz
+    if (name.includes('bute') || name.includes('beyaz') || name.includes('bb')) {
+      return 'bute_beyaz';
+    }
+    
+    return null;
+  };
+
   // ✅ Ürünleri modellerine göre grupla (KANAT için)
   const groupProductsByModel = (category) => {
     const filteredProducts = products.filter(p => p.category === category);
@@ -206,7 +215,7 @@ const StockList = () => {
     return groups;
   };
 
-  // ✅ Kasa Takım renklerine göre grupla - RENK BAZINDA
+  // ✅ Kasa Takım renklerine göre grupla - ÜRÜN ADINA GÖRE
   const groupProductsByKasaColor = () => {
     const filteredProducts = products.filter(p => p.category === 'kasa');
     const groups = {};
@@ -218,41 +227,19 @@ const StockList = () => {
 
     // Ürünleri renklerine göre doldur
     filteredProducts.forEach(product => {
-      const productColor = product.color || '';
+      const colorId = getProductColor(product);
       let assigned = false;
       
-      // Ürünün rengine göre eşleştir
-      for (const color of kasaColors) {
-        if (productColor === color.id || productColor === color.label) {
+      if (colorId) {
+        const color = kasaColors.find(c => c.id === colorId);
+        if (color && groups[color.label]) {
           groups[color.label].push(product);
           assigned = true;
-          break;
         }
       }
       
-      // Eğer renk atanmamışsa veya eşleşmediyse, ürün adına göre dene
+      // Eğer renk bulunamadıysa "Diğer" grubuna ekle
       if (!assigned) {
-        const productName = product.name.toLowerCase();
-        const productCode = product.code?.toLowerCase() || '';
-        
-        for (const color of kasaColors) {
-          const colorId = color.id.toLowerCase();
-          const colorLabel = color.label.toLowerCase();
-          
-          if (productName.includes(colorId) || 
-              productName.includes(colorLabel) ||
-              productCode.includes(colorId) ||
-              productCode.includes(colorLabel)) {
-            groups[color.label].push(product);
-            assigned = true;
-            break;
-          }
-        }
-      }
-      
-      // Hala atanmadıysa "Diğer" grubuna ekle
-      if (!assigned) {
-        // "Diğer" grubu yoksa oluştur
         if (!groups['Diğer']) {
           groups['Diğer'] = [];
         }
@@ -323,7 +310,7 @@ const StockList = () => {
     );
   };
 
-  // ✅ Kasa Takım Renk Kartı - RENK BAZINDA
+  // ✅ Kasa Takım Renk Kartı
   const KasaColorCard = ({ colorLabel, products: colorProducts }) => {
     const isExpanded = expandedGroups[colorLabel] !== false;
     const totalStock = colorProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
@@ -408,6 +395,8 @@ const StockList = () => {
     const barColor = getStockColor(quantity);
     const status = getStockStatus(quantity);
     const isEditing = editingProduct?._id === product._id && user?.role === 'admin';
+    const productColor = getProductColor(product);
+    const colorInfo = kasaColors.find(c => c.id === productColor);
 
     return (
       <div key={product._id} className="bg-white rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
@@ -430,29 +419,12 @@ const StockList = () => {
               />
               <select
                 value={editForm.category || product.category}
-                onChange={(e) => {
-                  setEditForm({ ...editForm, category: e.target.value });
-                }}
+                onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
                 className="input-field text-xs py-1"
               >
                 <option value="kanat">🚪 Kanat</option>
                 <option value="kasa">🪟 Kasa Takım</option>
               </select>
-              {editForm.category === 'kasa' && (
-                <select
-                  value={editForm.color || product.color || ''}
-                  onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
-                  className="input-field text-xs py-1"
-                  required
-                >
-                  <option value="">Renk Seç</option>
-                  {kasaColors.map(color => (
-                    <option key={color.id} value={color.id}>
-                      {color.emoji} {color.label}
-                    </option>
-                  ))}
-                </select>
-              )}
               <div className="flex gap-1">
                 <button type="submit" className="btn-primary text-xs py-0.5 px-2">
                   <CheckIcon className="h-3 w-3" /> Kaydet
@@ -472,6 +444,18 @@ const StockList = () => {
               <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
                 {product.category === 'kanat' ? '🚪' : '🪟'}
               </span>
+              {product.category === 'kasa' && colorInfo && (
+                <span 
+                  className="text-xs px-1.5 py-0.5 rounded-full"
+                  style={{
+                    backgroundColor: colorInfo.color,
+                    color: colorInfo.textColor,
+                    border: colorInfo.id === 'acik_gri' ? '1px solid #9ca3af' : 'none'
+                  }}
+                >
+                  {colorInfo.emoji} {colorInfo.label}
+                </span>
+              )}
               {user?.role === 'admin' && (
                 <button
                   onClick={() => {
@@ -480,8 +464,7 @@ const StockList = () => {
                       name: product.name,
                       code: product.code,
                       description: product.description || '',
-                      category: product.category || 'kanat',
-                      color: product.color || ''
+                      category: product.category || 'kanat'
                     });
                   }}
                   className="text-gray-400 hover:text-blue-600"
@@ -770,9 +753,7 @@ const StockList = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Kategori *</label>
                 <select
                   value={newProduct.category}
-                  onChange={(e) => {
-                    setNewProduct({ ...newProduct, category: e.target.value, color: '' });
-                  }}
+                  onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })}
                   className="input-field"
                   required
                 >
@@ -782,21 +763,13 @@ const StockList = () => {
               </div>
 
               {newProduct.category === 'kasa' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Renk *</label>
-                  <select
-                    value={newProduct.color}
-                    onChange={(e) => setNewProduct({ ...newProduct, color: e.target.value })}
-                    className="input-field"
-                    required
-                  >
-                    <option value="">Renk Seçin</option>
-                    {kasaColors.map(color => (
-                      <option key={color.id} value={color.id}>
-                        {color.emoji} {color.label}
-                      </option>
-                    ))}
-                  </select>
+                <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
+                  <p className="text-sm text-purple-800 font-medium">⚠️ Renk Bilgisi</p>
+                  <p className="text-xs text-purple-600 mt-1">
+                    Ürün adında <strong>Beyaz, Gri, Koyu, Açık, Taş</strong> gibi kelimeler olmalıdır.
+                    <br />
+                    Örnek: <strong>21.5 AÇIK GRİ</strong> → Açık Gri grubuna gider
+                  </p>
                 </div>
               )}
 
@@ -816,7 +789,7 @@ const StockList = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Model Adı *</label>
                 <input
                   type="text"
-                  placeholder="Örn: 618 BUTE 87"
+                  placeholder="Örn: 618 BUTE 87 veya 21.5 AÇIK GRİ"
                   value={newProduct.name}
                   onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
                   className="input-field"
