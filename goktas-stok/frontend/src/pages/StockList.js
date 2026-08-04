@@ -29,12 +29,12 @@ const StockList = () => {
   const [activeTab, setActiveTab] = useState('kanat');
   const [loading, setLoading] = useState(true);
 
-  // 🎯 Kasa Takım renkleri
+  // 🎯 Kasa Takım renkleri - DÜZELTİLDİ
   const kasaColors = [
-    { id: 'bute_beyaz', label: 'Bute Beyaz', color: '#f5f5f5', emoji: '⚪' },
-    { id: 'koyu_gri', label: 'Koyu Gri', color: '#4a4a4a', emoji: '⚫' },
-    { id: 'acik_gri', label: 'Açık Gri', color: '#9ca3af', emoji: '🔘' },
-    { id: 'tas_gri', label: 'Taş Gri', color: '#6b7280', emoji: '🪨' }
+    { id: 'bute_beyaz', label: 'Bute Beyaz', color: '#f3f4f6', textColor: '#1f2937', emoji: '⚪' },
+    { id: 'koyu_gri', label: 'Koyu Gri', color: '#4b5563', textColor: '#ffffff', emoji: '⚫' },
+    { id: 'acik_gri', label: 'Açık Gri', color: '#e5e7eb', textColor: '#1f2937', emoji: '🔘' },
+    { id: 'tas_gri', label: 'Taş Gri', color: '#6b7280', textColor: '#ffffff', emoji: '🪨' }
   ];
 
   const branches = [
@@ -213,7 +213,7 @@ const StockList = () => {
     return groups;
   };
 
-  // ✅ Kasa Takım renklerine göre grupla - GELİŞTİRİLMİŞ (ÇOK ESNEK)
+  // ✅ Kasa Takım renklerine göre grupla - DÜZELTİLDİ
   const groupProductsByKasaColor = () => {
     const filteredProducts = products.filter(p => p.category === 'kasa');
     const groups = {};
@@ -226,11 +226,11 @@ const StockList = () => {
     // "Diğer" grubunu ekle
     groups['Diğer'] = [];
 
-    // 🎯 Renk eşleştirme anahtarları (ÇOK ESNEK)
+    // 🎯 Renk eşleştirme anahtarları - DÜZELTİLDİ
     const colorKeys = {
       'Bute Beyaz': ['bute beyaz', 'beyaz', 'bute', 'bb', 'bey'],
       'Koyu Gri': ['koyu gri', 'koyu', 'kg', 'gri koyu'],
-      'Açık Gri': ['açık gri', 'açık', 'acik', 'ag', 'gri açık', 'acik gri'],
+      'Açık Gri': ['açık gri', 'açık', 'acik', 'ag', 'gri açık', 'acik gri', 'gri'],
       'Taş Gri': ['taş gri', 'tas gri', 'tas', 'tg', 'gri taş']
     };
 
@@ -323,13 +323,14 @@ const StockList = () => {
     );
   };
 
-  // ✅ Kasa Takım Renk Kartı
+  // ✅ Kasa Takım Renk Kartı - DÜZELTİLDİ
   const KasaColorCard = ({ colorLabel, products: colorProducts }) => {
     const isExpanded = expandedGroups[colorLabel] !== false;
     const totalStock = colorProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
     const colors = getCategoryColors('kasa');
     const colorInfo = kasaColors.find(c => c.label === colorLabel);
     const isOther = colorLabel === 'Diğer';
+    const isAcikGri = colorLabel === 'Açık Gri';
 
     return (
       <div className={`bg-white rounded-xl shadow-md overflow-hidden border-l-4 ${colors.border} shadow-lg hover:shadow-xl transition-shadow duration-300`}>
@@ -341,12 +342,27 @@ const StockList = () => {
             <button className="text-gray-600">
               {isExpanded ? <ChevronDownIcon className="h-5 w-5" /> : <ChevronRightIcon className="h-5 w-5" />}
             </button>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               {!isOther && colorInfo && (
-                <span 
-                  className="w-6 h-6 rounded-full border border-gray-300 flex-shrink-0"
-                  style={{ backgroundColor: colorInfo.color }}
-                />
+                <div className="flex items-center gap-2">
+                  <span 
+                    className={`w-7 h-7 rounded-full flex-shrink-0 ${isAcikGri ? 'border-2 border-gray-400' : 'border border-gray-300'}`}
+                    style={{ 
+                      backgroundColor: colorInfo.color,
+                      boxShadow: isAcikGri ? 'inset 0 0 0 1px rgba(0,0,0,0.1)' : 'none'
+                    }}
+                  />
+                  <span 
+                    className="text-xs font-medium px-2.5 py-0.5 rounded-full"
+                    style={{ 
+                      backgroundColor: colorInfo.color,
+                      color: colorInfo.textColor,
+                      border: isAcikGri ? '1px solid #9ca3af' : 'none'
+                    }}
+                  >
+                    {colorInfo.label}
+                  </span>
+                </div>
               )}
               <div>
                 <h3 className="font-bold text-gray-900 text-lg">
@@ -531,7 +547,7 @@ const StockList = () => {
   const kanatGroups = groupProductsByModel('kanat');
   const kasaGroups = groupProductsByKasaColor();
 
-  // Kasa gruplarını renk sırasına göre düzenle
+  // Kasa gruplarını renk sırasına göre düzenle - DÜZELTİLDİ
   const orderedKasaGroups = {};
   kasaColors.forEach(color => {
     if (kasaGroups[color.label] && kasaGroups[color.label].length > 0) {
