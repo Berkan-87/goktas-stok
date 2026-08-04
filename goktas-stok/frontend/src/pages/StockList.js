@@ -31,10 +31,10 @@ const StockList = () => {
 
   // 🎯 Kasa Takım renkleri
   const kasaColors = [
-    { id: 'bute_beyaz', label: 'Bute Beyaz', color: '#f3f4f6', textColor: '#1f2937', emoji: '⚪', keywords: ['bute', 'beyaz', 'bb'] },
-    { id: 'koyu_gri', label: 'Koyu Gri', color: '#4b5563', textColor: '#ffffff', emoji: '⚫', keywords: ['koyu', 'kg'] },
-    { id: 'acik_gri', label: 'Açık Gri', color: '#e5e7eb', textColor: '#1f2937', emoji: '🔘', keywords: ['açık', 'acik', 'ag'] },
-    { id: 'tas_gri', label: 'Taş Gri', color: '#6b7280', textColor: '#ffffff', emoji: '🪨', keywords: ['taş', 'tas', 'tg'] }
+    { id: 'bute_beyaz', label: 'Bute Beyaz', color: '#f3f4f6', textColor: '#1f2937', emoji: '⚪' },
+    { id: 'koyu_gri', label: 'Koyu Gri', color: '#4b5563', textColor: '#ffffff', emoji: '⚫' },
+    { id: 'acik_gri', label: 'Açık Gri', color: '#e5e7eb', textColor: '#1f2937', emoji: '🔘' },
+    { id: 'tas_gri', label: 'Taş Gri', color: '#6b7280', textColor: '#ffffff', emoji: '🪨' }
   ];
 
   const branches = [
@@ -176,28 +176,29 @@ const StockList = () => {
     return Math.min(percentage, 100);
   };
 
-  // ✅ Ürünün rengini bul (ÜRÜN ADINA GÖRE)
+  // ✅ Ürünün rengini bul - DÜZELTİLDİ (Büyük/küçük harf duyarsız)
   const getProductColor = (product) => {
-    const name = product.name.toLowerCase();
-    const code = product.code?.toLowerCase() || '';
+    const name = product.name.toUpperCase();
+    const code = product.code?.toUpperCase() || '';
     
-    // Önce Taş Gri kontrol et (en spesifik)
-    if (name.includes('taş') || name.includes('tas') || name.includes('tg')) {
+    // ÖNCE TAŞ GRİ KONTROL ET (en spesifik)
+    if (name.includes('TAŞ') || name.includes('TAS') || name.includes('TG')) {
       return 'tas_gri';
     }
-    // Sonra Koyu Gri
-    if (name.includes('koyu') || name.includes('kg')) {
+    // SONRA KOYU GRİ
+    if (name.includes('KOYU') || name.includes('KG')) {
       return 'koyu_gri';
     }
-    // Sonra Açık Gri
-    if (name.includes('açık') || name.includes('acik') || name.includes('ag')) {
+    // SONRA AÇIK GRİ
+    if (name.includes('AÇIK') || name.includes('ACIK') || name.includes('AG')) {
       return 'acik_gri';
     }
-    // Sonra Bute Beyaz
-    if (name.includes('bute') || name.includes('beyaz') || name.includes('bb')) {
+    // SONRA BUTE BEYAZ
+    if (name.includes('BUTE') || name.includes('BEYAZ') || name.includes('BB')) {
       return 'bute_beyaz';
     }
     
+    // Eğer hiçbiri yoksa null dön
     return null;
   };
 
@@ -215,7 +216,7 @@ const StockList = () => {
     return groups;
   };
 
-  // ✅ Kasa Takım renklerine göre grupla - ÜRÜN ADINA GÖRE
+  // ✅ Kasa Takım renklerine göre grupla - DÜZELTİLDİ
   const groupProductsByKasaColor = () => {
     const filteredProducts = products.filter(p => p.category === 'kasa');
     const groups = {};
@@ -228,23 +229,20 @@ const StockList = () => {
     // Ürünleri renklerine göre doldur
     filteredProducts.forEach(product => {
       const colorId = getProductColor(product);
-      let assigned = false;
       
       if (colorId) {
         const color = kasaColors.find(c => c.id === colorId);
         if (color && groups[color.label]) {
           groups[color.label].push(product);
-          assigned = true;
+          return;
         }
       }
       
       // Eğer renk bulunamadıysa "Diğer" grubuna ekle
-      if (!assigned) {
-        if (!groups['Diğer']) {
-          groups['Diğer'] = [];
-        }
-        groups['Diğer'].push(product);
+      if (!groups['Diğer']) {
+        groups['Diğer'] = [];
       }
+      groups['Diğer'].push(product);
     });
 
     // Boş renk gruplarını kaldır
@@ -395,8 +393,8 @@ const StockList = () => {
     const barColor = getStockColor(quantity);
     const status = getStockStatus(quantity);
     const isEditing = editingProduct?._id === product._id && user?.role === 'admin';
-    const productColor = getProductColor(product);
-    const colorInfo = kasaColors.find(c => c.id === productColor);
+    const colorId = getProductColor(product);
+    const colorInfo = kasaColors.find(c => c.id === colorId);
 
     return (
       <div key={product._id} className="bg-white rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
@@ -446,7 +444,7 @@ const StockList = () => {
               </span>
               {product.category === 'kasa' && colorInfo && (
                 <span 
-                  className="text-xs px-1.5 py-0.5 rounded-full"
+                  className="text-xs px-1.5 py-0.5 rounded-full font-medium"
                   style={{
                     backgroundColor: colorInfo.color,
                     color: colorInfo.textColor,
@@ -766,7 +764,7 @@ const StockList = () => {
                 <div className="mb-4 p-3 bg-purple-50 rounded-lg border border-purple-200">
                   <p className="text-sm text-purple-800 font-medium">⚠️ Renk Bilgisi</p>
                   <p className="text-xs text-purple-600 mt-1">
-                    Ürün adında <strong>Beyaz, Gri, Koyu, Açık, Taş</strong> gibi kelimeler olmalıdır.
+                    Ürün adında <strong>BEYAZ, GRİ, KOYU, AÇIK, TAŞ</strong> gibi kelimeler olmalıdır.
                     <br />
                     Örnek: <strong>21.5 AÇIK GRİ</strong> → Açık Gri grubuna gider
                   </p>
