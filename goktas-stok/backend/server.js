@@ -134,14 +134,13 @@ const autoSeedDatabase = async () => {
   }
 };
 
-// MongoDB Connection - BURASI DEĞİŞTİRİLDİ
+// MongoDB Connection (Artık .env'deki ana veritabanına bağlanacak)
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/goktas-stok', {
-  dbName: 'test',  // <-- ÖNEMLİ: Veritabanını zorla 'test' olarak ayarladık!
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
 .then(() => {
-    console.log('✅ MongoDB connected successfully (Database: test)');
+    console.log('✅ MongoDB connected successfully');
     // Bağlantı başarılı olunca yükleme fonksiyonunu tetikliyoruz
     autoSeedDatabase();
 })

@@ -4,7 +4,7 @@ const { body, validationResult } = require('express-validator');
 const Stock = require('../models/Stock');
 const Product = require('../models/Product');
 const Transaction = require('../models/Transaction');
-const History = require('../models/History'); // ✅ EKLENDI
+const History = require('../models/History');
 const auth = require('../middleware/auth');
 const { canModifyBranch } = require('../middleware/authorize');
 
@@ -296,6 +296,42 @@ router.put('/:id', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Stok güncelleme hatası:', error);
+    res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
+  }
+});
+
+// 📌 [YENİ EKLENEN ROTA] Sadece Kanat kategorisindeki ürünlerin toplam stok miktarı
+router.get('/total-kanat', auth, async (req, res) => {
+  try {
+    // 1. Tüm 'kanat' kategorisindeki ürünlerin ID'lerini al
+    const kanatProducts = await Product.find({ category: 'kanat', isActive: true }).select('_id');
+    const kanatProductIds = kanatProducts.map(p => p._id);
+
+    // 2. Eğer hiç kanat ürünü yoksa direkt 0 döndür
+    if (kanatProductIds.length === 0) {
+      return res.json({ totalQuantity: 0 });
+    }
+
+    // 3. Sadece bu ID'lere sahip stokların miktarlarını topla (Aggregation Pipeline)
+    const result = await Stock.aggregate([
+      {
+        $match: {
+          productId: { $in: kanatProductIds }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          totalQuantity: { $sum: '$quantity' }
+        }
+      }
+    ]);
+
+    const totalQuantity = result.length > 0 ? result[0].totalQuantity : 0;
+
+    res.json({ totalQuantity });
+  } catch (error) {
+    console.error('❌ Toplam kanat stok hesaplanırken hata:', error);
     res.status(500).json({ message: 'Sunucu hatası: ' + error.message });
   }
 });

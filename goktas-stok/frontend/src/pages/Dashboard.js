@@ -3,7 +3,6 @@ import { useSelector } from 'react-redux';
 import axios from '../utils/axios';
 import { 
   CubeIcon, 
-  ArrowsRightLeftIcon, 
   ClockIcon,
   ExclamationTriangleIcon 
 } from '@heroicons/react/24/outline';
@@ -35,9 +34,14 @@ const Dashboard = () => {
       ]);
 
       const stocks = stockRes.data;
-      const totalStock = stocks.reduce((sum, s) => sum + s.quantity, 0);
       
-      // ✅ Düşük stok hesabı - kritik seviye 50 olarak ayarlandı
+      // ✅ DEĞİŞİKLİK 1: Sadece 'kanat' kategorisindeki ürünlerin stoklarını filtrele
+      const kanatStocks = stocks.filter(s => s.productId?.category === 'kanat');
+      
+      // ✅ DEĞİŞİKLİK 2: Toplam stok hesaplamasını 'kanatStocks' üzerinden yap
+      const totalStock = kanatStocks.reduce((sum, s) => sum + s.quantity, 0);
+      
+      // ✅ Düşük stok hesabı - (Uyarılar için tüm ürünlere bakılır, kasalar da uyarıda görünür)
       const CRITICAL_LEVEL = 50;
       const lowStockItems = stocks.filter(s => s.quantity <= CRITICAL_LEVEL && s.quantity > 0);
       const lowStockCount = lowStockItems.length;
@@ -55,7 +59,7 @@ const Dashboard = () => {
         .slice(0, 10);
       setLowStockItems(sortedLowItems);
 
-      // Şube bazlı stok grafiği
+      // Şube bazlı stok grafiği (Grafikte de tüm stokların dağılımı görünsün)
       const branchStats = {};
       stocks.forEach(stock => {
         if (!branchStats[stock.branch]) {
@@ -93,7 +97,7 @@ const Dashboard = () => {
 
   const statsCards = [
     { title: 'Toplam Ürün', value: stats.totalProducts, icon: CubeIcon, color: 'bg-blue-500' },
-    { title: 'Toplam Stok', value: stats.totalStock, icon: CubeIcon, color: 'bg-green-500' },
+    { title: 'Toplam Stok (Sadece Kanatlar)', value: stats.totalStock, icon: CubeIcon, color: 'bg-green-500' }, // ✅ Başlığa not düştük
     { title: 'Düşük Stok', value: stats.lowStock, icon: ExclamationTriangleIcon, color: 'bg-yellow-500' },
     { title: 'Son İşlemler', value: stats.recentTransactions, icon: ClockIcon, color: 'bg-purple-500' },
   ];

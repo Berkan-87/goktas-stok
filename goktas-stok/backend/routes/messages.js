@@ -13,12 +13,10 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Mesaj içeriği boş olamaz' });
     }
 
-    // Özel mesaj veya grup mesajı kontrolü
     if (!receiver && !group) {
       return res.status(400).json({ message: 'Alıcı veya grup belirtilmelidir' });
     }
 
-    // Grup mesajıysa, kullanıcı grupta mı kontrol et
     if (group) {
       const groupData = await Group.findById(group);
       if (!groupData) {
@@ -29,12 +27,14 @@ router.post('/', auth, async (req, res) => {
       }
     }
 
+    // ✅ Yeni mesaj oluştururken, gönderen kendisi zaten okuduğu için readBy'ya kendini ekle.
     const message = new Message({
       sender: req.user._id,
       receiver: receiver || null,
       group: group || null,
       content,
-      type: 'text'
+      type: 'text',
+      readBy: [req.user._id] // Gönderen mesajı kendisi okumuş sayılır.
     });
 
     await message.save();
@@ -113,7 +113,7 @@ router.get('/group/:groupId', auth, async (req, res) => {
   }
 });
 
-// 📌 Mesajları okundu işaretle
+// ✅ TEK MESAJI OKUNDU İŞARETLE (Tek tek okutmak isterseniz)
 router.put('/read/:messageId', auth, async (req, res) => {
   try {
     const message = await Message.findById(req.params.messageId);
@@ -121,7 +121,7 @@ router.put('/read/:messageId', auth, async (req, res) => {
       return res.status(404).json({ message: 'Mesaj bulunamadı' });
     }
 
-    if (!message.readBy.includes(req.user._id)) {
+    if (!message.readBy.includes(req.user._id.toString())) {
       message.readBy.push(req.user._id);
       await message.save();
     }
@@ -129,6 +129,55 @@ router.put('/read/:messageId', auth, async (req, res) => {
     res.json({ message: 'Mesaj okundu olarak işaretlendi' });
   } catch (error) {
     console.error('❌ Mesaj okuma hatası:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ✅ [YENİ] BİR SOHBETTEKİ TÜM MESAJLARI OKUNDU İŞARETLE (Performanslı)
+router.put('/mark-all-read', auth, async (req, res) => {
+  try {
+    const { receiver, group } = req.body;
+    let filter = {};
+
+    // Genel sohbet
+    if (!receiver && !group) {
+      filter = { receiver: null, group: null };
+    } 
+    // Özel sohbet
+    else if (receiver) {
+      filter = {
+        $or: [
+          { sender: req.user._id, receiver: receiver },
+          { sender: receiver, receiver: req.user._id }
+        ]
+      };
+    } 
+    // Grup sohbeti
+    else if (group) {
+      filter = { group };
+    }
+
+    // Kullanıcının okumadığı mesajları bul
+    const unreadMessages = await Message.find({
+      ...filter,
+      readBy: { $ne: req.user._id } // readBy dizisinde kullanıcı ID'si OLMAYANLAR
+    });
+
+    // Toplu güncelleme (Her birine tek tek push atmak yerine)
+    const idsToUpdate = unreadMessages.map(m => m._id);
+    if (idsToUpdate.length > 0) {
+      await Message.updateMany(
+        { _id: { $in: idsToUpdate } },
+        { $addToSet: { readBy: req.user._id } } // ID zaten varsa ekleme
+      );
+    }
+
+    res.json({ 
+      message: `${idsToUpdate.length} mesaj okundu olarak işaretlendi.`,
+      count: idsToUpdate.length
+    });
+  } catch (error) {
+    console.error('❌ Toplu okuma hatası:', error);
     res.status(500).json({ message: error.message });
   }
 });

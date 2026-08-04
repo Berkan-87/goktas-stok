@@ -26,10 +26,7 @@ const messageSchema = new mongoose.Schema({
     enum: ['text', 'image', 'file'],
     default: 'text'
   },
-  isRead: {
-    type: Boolean,
-    default: false
-  },
+  // ✅ isRead alanını kaldırdık, readBy yeterli.
   readBy: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
