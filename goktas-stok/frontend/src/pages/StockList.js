@@ -213,7 +213,7 @@ const StockList = () => {
     return groups;
   };
 
-  // ✅ Kasa Takım renklerine göre grupla - DÜZELTİLDİ
+  // ✅ Kasa Takım renklerine göre grupla - TAMAMEN DÜZELTİLDİ
   const groupProductsByKasaColor = () => {
     const filteredProducts = products.filter(p => p.category === 'kasa');
     const groups = {};
@@ -226,21 +226,27 @@ const StockList = () => {
     // "Diğer" grubunu ekle
     groups['Diğer'] = [];
 
-    // 🎯 Renk eşleştirme anahtarları - DÜZELTİLDİ
+    // 🎯 Renk eşleştirme anahtarları - KARIŞIKLIK GİDERİLDİ
     const colorKeys = {
-      'Bute Beyaz': ['bute beyaz', 'beyaz', 'bute', 'bb', 'bey'],
-      'Koyu Gri': ['koyu gri', 'koyu', 'kg', 'gri koyu'],
-      'Açık Gri': ['açık gri', 'açık', 'acik', 'ag', 'gri açık', 'acik gri', 'gri'],
-      'Taş Gri': ['taş gri', 'tas gri', 'tas', 'tg', 'gri taş']
+      'Bute Beyaz': ['bute beyaz', 'beyaz', 'bute', 'bb'],
+      'Koyu Gri': ['koyu gri', 'koyu', 'kg'],
+      'Taş Gri': ['taş gri', 'tas gri', 'tas', 'tg'],
+      'Açık Gri': ['açık gri', 'açık', 'acik', 'ag']
     };
 
-    // Ürünleri renklerine göre doldur
+    // Ürünleri renklerine göre doldur - ÖNCELİK SIRASI ÖNEMLİ
     filteredProducts.forEach(product => {
       const productName = product.name.toLowerCase();
       const productCode = product.code?.toLowerCase() || '';
       let assigned = false;
       
-      for (const [colorLabel, keys] of Object.entries(colorKeys)) {
+      // Önce spesifik renkleri kontrol et (Taş Gri önce gelsin)
+      const colorOrder = ['Taş Gri', 'Koyu Gri', 'Açık Gri', 'Bute Beyaz'];
+      
+      for (const colorLabel of colorOrder) {
+        const keys = colorKeys[colorLabel];
+        if (!keys) continue;
+        
         for (const key of keys) {
           if (productName.includes(key) || productCode.includes(key)) {
             if (groups[colorLabel]) {
@@ -323,7 +329,7 @@ const StockList = () => {
     );
   };
 
-  // ✅ Kasa Takım Renk Kartı - DÜZELTİLDİ
+  // ✅ Kasa Takım Renk Kartı - TAMAMEN DÜZELTİLDİ
   const KasaColorCard = ({ colorLabel, products: colorProducts }) => {
     const isExpanded = expandedGroups[colorLabel] !== false;
     const totalStock = colorProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
@@ -547,7 +553,7 @@ const StockList = () => {
   const kanatGroups = groupProductsByModel('kanat');
   const kasaGroups = groupProductsByKasaColor();
 
-  // Kasa gruplarını renk sırasına göre düzenle - DÜZELTİLDİ
+  // Kasa gruplarını renk sırasına göre düzenle
   const orderedKasaGroups = {};
   kasaColors.forEach(color => {
     if (kasaGroups[color.label] && kasaGroups[color.label].length > 0) {
