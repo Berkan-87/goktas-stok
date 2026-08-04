@@ -3,13 +3,13 @@ const mongoose = require('mongoose');
 const productSchema = new mongoose.Schema({
   code: {
     type: String,
-    required: true,
+    required: [true, 'Ürün kodu zorunludur'], // Hata mesajı netleştirildi
     unique: true,
     trim: true
   },
   name: {
     type: String,
-    required: true,
+    required: [true, 'Ürün adı zorunludur'], // Hata mesajı netleştirildi
     trim: true
   },
   description: {
@@ -25,7 +25,7 @@ const productSchema = new mongoose.Schema({
     type: String,
     enum: ['kanat', 'kasa'],
     default: 'kanat',
-    required: true
+    required: [true, 'Kategori seçilmesi zorunludur']
   },
   isActive: {
     type: Boolean,
@@ -36,5 +36,8 @@ const productSchema = new mongoose.Schema({
     default: Date.now
   }
 });
+
+// ✅ Veritabanı performansı ve benzersizlik garantisi için indeks ekledik
+productSchema.index({ code: 1 }, { unique: true });
 
 module.exports = mongoose.model('Product', productSchema);
