@@ -23,7 +23,7 @@ app.use('/api/messages', require('./routes/messages'));  // Mesajlaşma
 app.use('/api/groups', require('./routes/groups'));      // Grup yönetimi
 app.use('/api/users', require('./routes/users'));        // Kullanıcı listesi
 
-// ✅ EKSİK STOKLARI DÜZELT (Verileri sıfırlama!)
+// ✅ EKSİK STOKLARI DÜZELT
 const fixMissingStocks = async () => {
   try {
     const Product = require('./models/Product');
@@ -58,7 +58,7 @@ const fixMissingStocks = async () => {
   }
 };
 
-// 🔄 OTOMATİK VERİTABANI DOLDURMA (SEED) FONKSİYONU - DÜZELTİLDİ
+// 🔄 OTOMATİK VERİTABANI DOLDURMA (SEED)
 const autoSeedDatabase = async () => {
   try {
     const User = require('./models/User');
@@ -88,7 +88,7 @@ const autoSeedDatabase = async () => {
       const createdUsers = await User.create(usersData);
       console.log(`👤 ${createdUsers.length} adet kullanıcı başarıyla oluşturuldu.`);
 
-      // 2. Ürün Listesi - KATEGORİ EKLENDİ
+      // 2. Ürün Listesi
       const productsData = [
         // KANAT ÜRÜNLERİ
         { code: '618 BUTE 87', name: '618 BUTE 87', description: 'Standart model', unit: 'adet', category: 'kanat' },
@@ -126,7 +126,7 @@ const autoSeedDatabase = async () => {
     } else {
       console.log('ℹ️ Veritabanında zaten kayıtlı kullanıcılar var, yükleme atlandı.');
       
-      // ✅ VERİLERİ SIFIRLAMA, SADECE EKSİK STOKLARI DÜZELT
+      // ✅ EKSİK STOKLARI DÜZELT (VERİLERİ SIFIRLAMA!)
       await fixMissingStocks();
     }
   } catch (err) {
@@ -134,14 +134,18 @@ const autoSeedDatabase = async () => {
   }
 };
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/goktas-stok')
-  .then(() => {
-    console.log('✅ MongoDB connected successfully');
+// MongoDB Connection - BURASI DEĞİŞTİRİLDİ
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/goktas-stok', {
+  dbName: 'test',  // <-- ÖNEMLİ: Veritabanını zorla 'test' olarak ayarladık!
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
+.then(() => {
+    console.log('✅ MongoDB connected successfully (Database: test)');
     // Bağlantı başarılı olunca yükleme fonksiyonunu tetikliyoruz
     autoSeedDatabase();
-  })
-  .catch((err) => console.error('❌ MongoDB connection error:', err));
+})
+.catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // Test route'u
 app.get('/api/test', (req, res) => {
