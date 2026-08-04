@@ -41,7 +41,15 @@ const MainLayout = () => { // ✅ children prop'unu kaldır, Outlet kullan
     <div className="min-h-screen bg-gray-100">
       {/* Mobil Menü Butonu */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 bg-white shadow-md p-4 flex justify-between items-center">
-        <h1 className="text-lg font-bold text-blue-600">🚪 Göktaş Stok</h1>
+        <h1 className="text-lg font-bold text-blue-600 flex items-center gap-2">
+          {/* Direkt public klasöründeki logo.svg'i çağırıyoruz */}
+          <img 
+            src="/logo192.png" 
+            alt="Göktaş Stok Logo" 
+            className="h-6 w-6 object-contain" 
+          />
+          GÖKTAŞ KAPI
+        </h1>
         <button onClick={() => setSidebarOpen(!sidebarOpen)}>
           {sidebarOpen ? (
             <XMarkIcon className="h-6 w-6" />
