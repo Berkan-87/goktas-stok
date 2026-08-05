@@ -9,7 +9,8 @@ import {
   BellSlashIcon,
   Bars3Icon,
   XMarkIcon,
-  MagnifyingGlassIcon
+  MagnifyingGlassIcon,
+  CheckBadgeIcon
 } from '@heroicons/react/24/outline';
 
 const Chat = () => {
@@ -29,12 +30,14 @@ const Chat = () => {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isMarkingRead, setIsMarkingRead] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const audioRef = useRef(null);
   const isFirstLoad = useRef(true);
+  const lastMessageIdRef = useRef(null);
 
-  // ✅ Ses çalma fonksiyonu
+  // ✅ Ses çalma
   const playSound = () => {
     if (!soundEnabled) return;
     try {
@@ -115,15 +118,12 @@ const Chat = () => {
     }
   }, []);
 
-  // ✅ Kullanıcıları ve grupları getir - TÜM KULLANICILAR
+  // ✅ Kullanıcıları ve grupları getir
   useEffect(() => {
     fetchUsersAndGroups();
-    
-    // Her 30 saniyede bir yenile
     const interval = setInterval(() => {
       fetchUsersAndGroups();
     }, 30000);
-    
     return () => clearInterval(interval);
   }, []);
 
@@ -134,20 +134,11 @@ const Chat = () => {
         axios.get('/groups')
       ]);
       
-      // ✅ TÜM KULLANICILARI GÖSTER (kendini hariç tut)
       const filteredUsers = usersRes.data.filter(u => u._id !== user._id);
-      
-      console.log('📱 Tüm kullanıcılar:', usersRes.data.length);
-      console.log('📱 Kendi hariç:', filteredUsers.length);
-      console.log('📱 Kullanıcı listesi:', filteredUsers.map(u => u.name || u.username));
-      
       setUsers(filteredUsers);
       setGroups(groupsRes.data);
       
-      // ✅ Sohbet listesini oluştur - TÜM KULLANICILAR
       const chats = [];
-      
-      // Genel sohbet
       chats.push({
         id: 'general',
         type: 'general',
@@ -155,7 +146,6 @@ const Chat = () => {
         icon: '💬'
       });
       
-      // ✅ TÜM KULLANICILARI EKLE
       filteredUsers.forEach(u => {
         chats.push({
           id: u._id,
@@ -166,7 +156,6 @@ const Chat = () => {
         });
       });
       
-      // Grup sohbetleri
       groupsRes.data.forEach(g => {
         chats.push({
           id: g._id,
@@ -177,10 +166,8 @@ const Chat = () => {
       });
       
       setActiveChats(chats);
-      
     } catch (error) {
       console.error('❌ Veriler alınamadı:', error);
-      toast.error('Kullanıcı listesi alınamadı');
     }
   };
 
@@ -201,15 +188,25 @@ const Chat = () => {
       const response = await axios.get('/messages/general');
       const newMessages = response.data;
       
+      // ✅ Yeni mesaj kontrolü
       if (!isFirstLoad.current && messages.length > 0 && newMessages.length > messages.length) {
         const newMsg = newMessages[newMessages.length - 1];
         if (newMsg.sender?._id !== user._id) {
           showNotification(newMsg);
           playSound();
+          // ✅ Okunmamış mesaj var, listeyi güncelle
+          setMessages(newMessages);
+          // ✅ Okunmamış mesajları otomatik okuma (sohbetteysen)
+          if (chatType === 'general') {
+            await markAllAsRead('general');
+          }
+        } else {
+          setMessages(newMessages);
         }
+      } else {
+        setMessages(newMessages);
       }
       
-      setMessages(newMessages);
       isFirstLoad.current = false;
       scrollToBottom();
     } catch (error) {
@@ -230,12 +227,16 @@ const Chat = () => {
         if (newMsg.sender?._id !== user._id) {
           showNotification(newMsg);
           playSound();
+          setMessages(newMessages);
+          await markAllAsRead('private', userId);
+        } else {
+          setMessages(newMessages);
         }
+      } else {
+        setMessages(newMessages);
       }
       
-      setMessages(newMessages);
       isFirstLoad.current = false;
-      await markAllAsRead('private', userId);
       scrollToBottom();
     } catch (error) {
       toast.error('Mesajlar alınamadı');
@@ -255,12 +256,16 @@ const Chat = () => {
         if (newMsg.sender?._id !== user._id) {
           showNotification(newMsg);
           playSound();
+          setMessages(newMessages);
+          await markAllAsRead('group', groupId);
+        } else {
+          setMessages(newMessages);
         }
+      } else {
+        setMessages(newMessages);
       }
       
-      setMessages(newMessages);
       isFirstLoad.current = false;
-      await markAllAsRead('group', groupId);
       scrollToBottom();
     } catch (error) {
       toast.error('Mesajlar alınamadı');
@@ -280,6 +285,9 @@ const Chat = () => {
 
   // ✅ Tüm mesajları okundu işaretle
   const markAllAsRead = async (type, id) => {
+    if (isMarkingRead) return;
+    setIsMarkingRead(true);
+    
     try {
       const payload = {};
       if (type === 'private') {
@@ -293,14 +301,43 @@ const Chat = () => {
       
       await axios.put('/messages/mark-all-read', payload);
       
-      setMessages(prev => prev.map(m => ({
-        ...m,
-        readBy: [...(m.readBy || []), user._id]
-      })));
+      // ✅ UI'da güncelle - tüm mesajları okundu yap
+      setMessages(prev => prev.map(m => {
+        if (!m.readBy?.includes(user._id) && m.sender?._id !== user._id) {
+          return {
+            ...m,
+            readBy: [...(m.readBy || []), user._id]
+          };
+        }
+        return m;
+      }));
       
       updateUnreadCounts();
     } catch (error) {
       console.error('Okundu işaretleme hatası:', error);
+    } finally {
+      setIsMarkingRead(false);
+    }
+  };
+
+  // ✅ Tek bir mesajı okundu işaretle
+  const markMessageAsRead = async (messageId) => {
+    try {
+      await axios.put(`/messages/read/${messageId}`);
+      
+      setMessages(prev => prev.map(m => {
+        if (m._id === messageId && !m.readBy?.includes(user._id)) {
+          return {
+            ...m,
+            readBy: [...(m.readBy || []), user._id]
+          };
+        }
+        return m;
+      }));
+      
+      updateUnreadCounts();
+    } catch (error) {
+      console.error('Mesaj okuma hatası:', error);
     }
   };
 
@@ -354,6 +391,9 @@ const Chat = () => {
       const response = await axios.post('/messages', payload);
       const newMsg = response.data;
       
+      // ✅ Gönderen mesajı otomatik okundu
+      newMsg.readBy = [user._id];
+      
       setMessages(prev => [...prev, newMsg]);
       setNewMessage('');
       scrollToBottom();
@@ -387,7 +427,7 @@ const Chat = () => {
 
   // ✅ Okunmamış mesaj kontrolü
   const isUnread = (message) => {
-    if (!message.readBy) return false;
+    if (!message.readBy) return true;
     return !message.readBy.includes(user._id) && message.sender?._id !== user._id;
   };
 
@@ -401,7 +441,7 @@ const Chat = () => {
     updateUnreadCounts();
   }, [messages, activeChats]);
 
-  // ✅ Otomatik yenileme
+  // ✅ Otomatik yenileme (3 saniye)
   useEffect(() => {
     const interval = setInterval(() => {
       if (chatType === 'general') {
@@ -420,6 +460,13 @@ const Chat = () => {
   const filteredChats = activeChats.filter(chat => 
     chat.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  // ✅ Mesaja tıklandığında okundu işaretle
+  const handleMessageClick = (message) => {
+    if (isUnread(message)) {
+      markMessageAsRead(message._id);
+    }
+  };
 
   if (loading && messages.length === 0) {
     return (
@@ -449,6 +496,15 @@ const Chat = () => {
   // ✅ Toplam okunmamış mesaj sayısı
   const totalUnread = messages.filter(m => isUnread(m)).length;
 
+  // ✅ Okunmamış mesajları en üste al (WhatsApp/Gmail tarzı)
+  const sortedMessages = [...messages].sort((a, b) => {
+    const aUnread = isUnread(a);
+    const bUnread = isUnread(b);
+    if (aUnread && !bUnread) return -1;
+    if (!aUnread && bUnread) return 1;
+    return new Date(a.createdAt) - new Date(b.createdAt);
+  });
+
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] bg-gray-50 rounded-xl shadow-lg overflow-hidden">
       
@@ -463,7 +519,7 @@ const Chat = () => {
         <h2 className="text-lg font-bold text-gray-900 truncate">{getChatTitle()}</h2>
         <div className="flex items-center gap-2">
           {totalUnread > 0 && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
               {totalUnread}
             </span>
           )}
@@ -481,7 +537,6 @@ const Chat = () => {
             lg:translate-x-0
           `}
         >
-          {/* Mobil kapatma butonu */}
           <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200">
             <h2 className="text-lg font-bold text-gray-900">💬 Sohbetler</h2>
             <button
@@ -492,7 +547,6 @@ const Chat = () => {
             </button>
           </div>
 
-          {/* Sidebar içeriği */}
           <div className="flex-1 overflow-y-auto">
             <div className="hidden lg:block p-4 border-b border-gray-200">
               <h2 className="text-lg font-bold text-gray-900">💬 Sohbetler</h2>
@@ -535,6 +589,9 @@ const Chat = () => {
                     <div className="min-w-0">
                       <span className="text-sm font-medium text-gray-700 truncate block">
                         {chat.name}
+                        {unread > 0 && (
+                          <span className="ml-2 text-xs text-red-500 font-bold">●</span>
+                        )}
                       </span>
                       {chat.role && chat.type === 'private' && (
                         <span className="text-xs text-gray-400 truncate block">
@@ -544,7 +601,7 @@ const Chat = () => {
                     </div>
                   </div>
                   {unread > 0 && (
-                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0 animate-pulse">
                       {unread}
                     </span>
                   )}
@@ -552,7 +609,6 @@ const Chat = () => {
               );
             })}
 
-            {/* Toplam kullanıcı bilgisi */}
             <div className="p-3 border-t border-gray-100 bg-gray-50">
               <p className="text-xs text-gray-500 text-center">
                 👥 {users.length} kullanıcı ile sohbet edebilirsin
@@ -576,7 +632,7 @@ const Chat = () => {
             <div className="flex items-center gap-3 min-w-0">
               <h2 className="text-xl font-bold text-gray-900 truncate">{getChatTitle()}</h2>
               {totalUnread > 0 && (
-                <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0">
+                <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full animate-pulse flex-shrink-0">
                   {totalUnread} yeni
                 </span>
               )}
@@ -637,30 +693,31 @@ const Chat = () => {
             </div>
           </div>
 
-          {/* Mesaj Listesi */}
+          {/* ✅ Mesaj Listesi - OKUNMAMIŞLAR EN ÜSTTE */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={messagesContainerRef}>
-            {messages.length === 0 ? (
+            {sortedMessages.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-400">Henüz mesaj yok</p>
                 <p className="text-sm text-gray-300 mt-1">İlk mesajı sen gönder!</p>
               </div>
             ) : (
-              messages.map((message) => {
+              sortedMessages.map((message) => {
                 const isOwn = message.sender?._id === user._id;
                 const unread = isUnread(message);
                 
                 return (
                   <div
                     key={message._id}
-                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-slideIn`}
+                    onClick={() => handleMessageClick(message)}
+                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-slideIn cursor-pointer`}
                   >
                     <div
-                      className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                      className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 transition-all ${
                         isOwn
                           ? 'bg-blue-500 text-white'
                           : unread
-                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400'
-                          : 'bg-white text-gray-900 border border-gray-200'
+                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400 hover:ring-3' // ✅ OKUNMAMIŞ - KOYU
+                          : 'bg-white text-gray-900 border border-gray-200 hover:shadow-md'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -668,15 +725,20 @@ const Chat = () => {
                           {isOwn ? 'Ben' : message.sender?.name || 'Kullanıcı'}
                         </span>
                         {unread && (
-                          <span className="text-xs bg-yellow-400 text-black px-2 py-0.5 rounded-full font-bold">
+                          <span className="text-xs bg-yellow-400 text-black px-2 py-0.5 rounded-full font-bold animate-pulse">
                             ● YENİ
+                          </span>
+                        )}
+                        {!unread && !isOwn && (
+                          <span className="text-xs text-gray-400">
+                            ✓✓ Okundu
                           </span>
                         )}
                       </div>
 
                       <p className="text-sm break-words">{message.content}</p>
 
-                      <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
+                      <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-100' : unread ? 'text-gray-300' : 'text-gray-400'}`}>
                         {new Date(message.createdAt).toLocaleString('tr-TR', {
                           hour: '2-digit',
                           minute: '2-digit',
