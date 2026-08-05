@@ -8,7 +8,8 @@ import {
   BellIcon,
   BellSlashIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 
 const Chat = () => {
@@ -27,6 +28,7 @@ const Chat = () => {
   const [activeChats, setActiveChats] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const audioRef = useRef(null);
@@ -113,9 +115,16 @@ const Chat = () => {
     }
   }, []);
 
-  // ✅ Kullanıcıları ve grupları getir
+  // ✅ Kullanıcıları ve grupları getir - TÜM KULLANICILAR
   useEffect(() => {
     fetchUsersAndGroups();
+    
+    // Her 30 saniyede bir yenile
+    const interval = setInterval(() => {
+      fetchUsersAndGroups();
+    }, 30000);
+    
+    return () => clearInterval(interval);
   }, []);
 
   const fetchUsersAndGroups = async () => {
@@ -124,11 +133,21 @@ const Chat = () => {
         axios.get('/users'),
         axios.get('/groups')
       ]);
-      setUsers(usersRes.data.filter(u => u._id !== user._id));
+      
+      // ✅ TÜM KULLANICILARI GÖSTER (kendini hariç tut)
+      const filteredUsers = usersRes.data.filter(u => u._id !== user._id);
+      
+      console.log('📱 Tüm kullanıcılar:', usersRes.data.length);
+      console.log('📱 Kendi hariç:', filteredUsers.length);
+      console.log('📱 Kullanıcı listesi:', filteredUsers.map(u => u.name || u.username));
+      
+      setUsers(filteredUsers);
       setGroups(groupsRes.data);
       
+      // ✅ Sohbet listesini oluştur - TÜM KULLANICILAR
       const chats = [];
       
+      // Genel sohbet
       chats.push({
         id: 'general',
         type: 'general',
@@ -136,15 +155,18 @@ const Chat = () => {
         icon: '💬'
       });
       
-      usersRes.data.filter(u => u._id !== user._id).forEach(u => {
+      // ✅ TÜM KULLANICILARI EKLE
+      filteredUsers.forEach(u => {
         chats.push({
           id: u._id,
           type: 'private',
-          name: u.name,
-          icon: '👤'
+          name: u.name || u.username || 'İsimsiz Kullanıcı',
+          icon: '👤',
+          role: u.role || 'Kullanıcı'
         });
       });
       
+      // Grup sohbetleri
       groupsRes.data.forEach(g => {
         chats.push({
           id: g._id,
@@ -155,8 +177,10 @@ const Chat = () => {
       });
       
       setActiveChats(chats);
+      
     } catch (error) {
-      console.error('Veriler alınamadı:', error);
+      console.error('❌ Veriler alınamadı:', error);
+      toast.error('Kullanıcı listesi alınamadı');
     }
   };
 
@@ -358,7 +382,6 @@ const Chat = () => {
     }
     setMessages([]);
     isFirstLoad.current = true;
-    // Mobilde sidebar'ı kapat
     setSidebarOpen(false);
   };
 
@@ -393,6 +416,11 @@ const Chat = () => {
     return () => clearInterval(interval);
   }, [chatType, selectedUser, selectedGroup]);
 
+  // ✅ Arama filtresi
+  const filteredChats = activeChats.filter(chat => 
+    chat.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (loading && messages.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -409,7 +437,7 @@ const Chat = () => {
     if (chatType === 'general') return '💬 Genel Sohbet';
     if (chatType === 'private') {
       const userData = users.find(u => u._id === selectedUser);
-      return `👤 ${userData?.name || 'Kullanıcı'}`;
+      return `👤 ${userData?.name || userData?.username || 'Kullanıcı'}`;
     }
     if (chatType === 'group') {
       const group = groups.find(g => g._id === selectedGroup);
@@ -424,7 +452,7 @@ const Chat = () => {
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] bg-gray-50 rounded-xl shadow-lg overflow-hidden">
       
-      {/* ✅ Mobil Header - Sidebar Toggle */}
+      {/* Mobil Header */}
       <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -432,7 +460,7 @@ const Chat = () => {
         >
           <Bars3Icon className="h-6 w-6 text-gray-600" />
         </button>
-        <h2 className="text-lg font-bold text-gray-900">{getChatTitle()}</h2>
+        <h2 className="text-lg font-bold text-gray-900 truncate">{getChatTitle()}</h2>
         <div className="flex items-center gap-2">
           {totalUnread > 0 && (
             <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
@@ -443,11 +471,11 @@ const Chat = () => {
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* ✅ Sidebar - Mobilde slide ediyor */}
+        {/* Sidebar */}
         <div 
           className={`
-            lg:relative lg:w-64 lg:flex lg:flex-col
-            fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200
+            lg:relative lg:w-72 lg:flex lg:flex-col
+            fixed inset-y-0 left-0 z-50 w-72 bg-white border-r border-gray-200
             transform transition-transform duration-300 ease-in-out
             ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
             lg:translate-x-0
@@ -468,8 +496,27 @@ const Chat = () => {
           <div className="flex-1 overflow-y-auto">
             <div className="hidden lg:block p-4 border-b border-gray-200">
               <h2 className="text-lg font-bold text-gray-900">💬 Sohbetler</h2>
+              <p className="text-xs text-gray-500 mt-1">
+                {activeChats.length - 1} kişiyle sohbet edebilirsin
+              </p>
             </div>
-            {activeChats.map((chat) => {
+
+            {/* Arama */}
+            <div className="p-3 border-b border-gray-100">
+              <div className="relative">
+                <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Kullanıcı ara..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            {/* Sohbet listesi */}
+            {filteredChats.map((chat) => {
               const unread = getUnreadCount(chat.id);
               return (
                 <button
@@ -485,9 +532,16 @@ const Chat = () => {
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <span className="text-xl flex-shrink-0">{chat.icon}</span>
-                    <span className="text-sm font-medium text-gray-700 truncate">
-                      {chat.name}
-                    </span>
+                    <div className="min-w-0">
+                      <span className="text-sm font-medium text-gray-700 truncate block">
+                        {chat.name}
+                      </span>
+                      {chat.role && chat.type === 'private' && (
+                        <span className="text-xs text-gray-400 truncate block">
+                          {chat.role}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {unread > 0 && (
                     <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">
@@ -497,10 +551,17 @@ const Chat = () => {
                 </button>
               );
             })}
+
+            {/* Toplam kullanıcı bilgisi */}
+            <div className="p-3 border-t border-gray-100 bg-gray-50">
+              <p className="text-xs text-gray-500 text-center">
+                👥 {users.length} kullanıcı ile sohbet edebilirsin
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* ✅ Mobil overlay */}
+        {/* Mobil overlay */}
         {sidebarOpen && (
           <div 
             className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
@@ -508,9 +569,9 @@ const Chat = () => {
           />
         )}
 
-        {/* ✅ Ana Sohbet Alanı */}
+        {/* Ana Sohbet Alanı */}
         <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
-          {/* ✅ Desktop Başlık - Mobilde gizli */}
+          {/* Desktop Başlık */}
           <div className="hidden lg:flex bg-white border-b border-gray-200 px-6 py-4 items-center justify-between">
             <div className="flex items-center gap-3 min-w-0">
               <h2 className="text-xl font-bold text-gray-900 truncate">{getChatTitle()}</h2>
@@ -543,6 +604,19 @@ const Chat = () => {
                 {notificationEnabled ? '🔔' : '🔕'}
               </button>
 
+              <button
+                onClick={() => {
+                  fetchUsersAndGroups();
+                  toast.success('Sohbet listesi yenilendi');
+                }}
+                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                title="Listeyi yenile"
+              >
+                <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+
               {totalUnread > 0 && (
                 <button
                   onClick={() => {
@@ -563,7 +637,7 @@ const Chat = () => {
             </div>
           </div>
 
-          {/* ✅ Mesaj Listesi */}
+          {/* Mesaj Listesi */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={messagesContainerRef}>
             {messages.length === 0 ? (
               <div className="text-center py-12">
@@ -619,7 +693,7 @@ const Chat = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* ✅ Mesaj Gönderme */}
+          {/* Mesaj Gönderme */}
           <div className="bg-white border-t border-gray-200 p-3 sm:p-4">
             <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-3">
               <input
