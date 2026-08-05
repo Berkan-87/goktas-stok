@@ -6,7 +6,9 @@ import {
   PaperAirplaneIcon, 
   UserCircleIcon,
   BellIcon,
-  BellSlashIcon
+  BellSlashIcon,
+  Bars3Icon,
+  XMarkIcon
 } from '@heroicons/react/24/outline';
 
 const Chat = () => {
@@ -24,6 +26,7 @@ const Chat = () => {
   const [groups, setGroups] = useState([]);
   const [activeChats, setActiveChats] = useState([]);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
   const audioRef = useRef(null);
@@ -53,7 +56,6 @@ const Chat = () => {
   const showNotification = (message) => {
     if (!notificationEnabled) return;
     
-    // Tarayıcı bildirimi
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('💬 Yeni Mesaj', {
         body: `${message.sender?.name || 'Kullanıcı'}: ${message.content}`,
@@ -63,7 +65,6 @@ const Chat = () => {
       });
     }
 
-    // Toast bildirimi
     toast.custom((t) => (
       <div
         className={`${
@@ -126,10 +127,8 @@ const Chat = () => {
       setUsers(usersRes.data.filter(u => u._id !== user._id));
       setGroups(groupsRes.data);
       
-      // Aktif sohbetleri oluştur
       const chats = [];
       
-      // Genel sohbet
       chats.push({
         id: 'general',
         type: 'general',
@@ -137,7 +136,6 @@ const Chat = () => {
         icon: '💬'
       });
       
-      // Özel sohbetler
       usersRes.data.filter(u => u._id !== user._id).forEach(u => {
         chats.push({
           id: u._id,
@@ -147,7 +145,6 @@ const Chat = () => {
         });
       });
       
-      // Grup sohbetleri
       groupsRes.data.forEach(g => {
         chats.push({
           id: g._id,
@@ -180,7 +177,6 @@ const Chat = () => {
       const response = await axios.get('/messages/general');
       const newMessages = response.data;
       
-      // Yeni mesaj kontrolü
       if (!isFirstLoad.current && messages.length > 0 && newMessages.length > messages.length) {
         const newMsg = newMessages[newMessages.length - 1];
         if (newMsg.sender?._id !== user._id) {
@@ -191,8 +187,6 @@ const Chat = () => {
       
       setMessages(newMessages);
       isFirstLoad.current = false;
-      
-      // Scroll'u en alta kaydır
       scrollToBottom();
     } catch (error) {
       toast.error('Mesajlar alınamadı');
@@ -207,7 +201,6 @@ const Chat = () => {
       const response = await axios.get(`/messages/private/${userId}`);
       const newMessages = response.data;
       
-      // Yeni mesaj kontrolü
       if (!isFirstLoad.current && messages.length > 0 && newMessages.length > messages.length) {
         const newMsg = newMessages[newMessages.length - 1];
         if (newMsg.sender?._id !== user._id) {
@@ -218,11 +211,7 @@ const Chat = () => {
       
       setMessages(newMessages);
       isFirstLoad.current = false;
-      
-      // Mesajları okundu işaretle
       await markAllAsRead('private', userId);
-      
-      // Scroll'u en alta kaydır
       scrollToBottom();
     } catch (error) {
       toast.error('Mesajlar alınamadı');
@@ -237,7 +226,6 @@ const Chat = () => {
       const response = await axios.get(`/messages/group/${groupId}`);
       const newMessages = response.data;
       
-      // Yeni mesaj kontrolü
       if (!isFirstLoad.current && messages.length > 0 && newMessages.length > messages.length) {
         const newMsg = newMessages[newMessages.length - 1];
         if (newMsg.sender?._id !== user._id) {
@@ -248,11 +236,7 @@ const Chat = () => {
       
       setMessages(newMessages);
       isFirstLoad.current = false;
-      
-      // Mesajları okundu işaretle
       await markAllAsRead('group', groupId);
-      
-      // Scroll'u en alta kaydır
       scrollToBottom();
     } catch (error) {
       toast.error('Mesajlar alınamadı');
@@ -285,13 +269,11 @@ const Chat = () => {
       
       await axios.put('/messages/mark-all-read', payload);
       
-      // UI'da güncelle
       setMessages(prev => prev.map(m => ({
         ...m,
         readBy: [...(m.readBy || []), user._id]
       })));
       
-      // Okunmamış sayısını güncelle
       updateUnreadCounts();
     } catch (error) {
       console.error('Okundu işaretleme hatası:', error);
@@ -348,11 +330,8 @@ const Chat = () => {
       const response = await axios.post('/messages', payload);
       const newMsg = response.data;
       
-      // Mesajı listeye ekle
       setMessages(prev => [...prev, newMsg]);
       setNewMessage('');
-      
-      // Scroll'u en alta kaydır
       scrollToBottom();
       
     } catch (error) {
@@ -379,6 +358,8 @@ const Chat = () => {
     }
     setMessages([]);
     isFirstLoad.current = true;
+    // Mobilde sidebar'ı kapat
+    setSidebarOpen(false);
   };
 
   // ✅ Okunmamış mesaj kontrolü
@@ -392,12 +373,12 @@ const Chat = () => {
     return unreadCounts[chatId] || 0;
   };
 
-  // ✅ Okunmamış sayılarını güncelle (mesajlar değiştiğinde)
+  // ✅ Okunmamış sayılarını güncelle
   useEffect(() => {
     updateUnreadCounts();
   }, [messages, activeChats]);
 
-  // ✅ Otomatik yenileme (3 saniye)
+  // ✅ Otomatik yenileme
   useEffect(() => {
     const interval = setInterval(() => {
       if (chatType === 'general') {
@@ -441,189 +422,225 @@ const Chat = () => {
   const totalUnread = messages.filter(m => isUnread(m)).length;
 
   return (
-    <div className="flex h-[calc(100vh-200px)] bg-gray-50 rounded-xl shadow-lg overflow-hidden">
-      {/* ✅ Sol Sidebar - Sohbet Listesi */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-lg font-bold text-gray-900">💬 Sohbetler</h2>
-          {Object.values(unreadCounts).reduce((a, b) => a + b, 0) > 0 && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
-              {Object.values(unreadCounts).reduce((a, b) => a + b, 0)}
+    <div className="flex flex-col h-[calc(100vh-200px)] bg-gray-50 rounded-xl shadow-lg overflow-hidden">
+      
+      {/* ✅ Mobil Header - Sidebar Toggle */}
+      <div className="lg:hidden bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
+        <button
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="p-2 rounded-lg hover:bg-gray-100"
+        >
+          <Bars3Icon className="h-6 w-6 text-gray-600" />
+        </button>
+        <h2 className="text-lg font-bold text-gray-900">{getChatTitle()}</h2>
+        <div className="flex items-center gap-2">
+          {totalUnread > 0 && (
+            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+              {totalUnread}
             </span>
           )}
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {activeChats.map((chat) => {
-            const unread = getUnreadCount(chat.id);
-            return (
-              <button
-                key={chat.id}
-                onClick={() => changeChat(chat)}
-                className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between ${
-                  (chatType === 'general' && chat.type === 'general') ||
-                  (chatType === 'private' && chat.type === 'private' && selectedUser === chat.id) ||
-                  (chatType === 'group' && chat.type === 'group' && selectedGroup === chat.id)
-                    ? 'bg-blue-50 border-r-4 border-blue-500'
-                    : ''
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-xl">{chat.icon}</span>
-                  <span className="text-sm font-medium text-gray-700 truncate">
-                    {chat.name}
-                  </span>
-                </div>
-                {unread > 0 && (
-                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
-                    {unread}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
       </div>
 
-      {/* ✅ Ana Sohbet Alanı */}
-      <div className="flex-1 flex flex-col">
-        {/* ✅ Başlık */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h2 className="text-xl font-bold text-gray-900">{getChatTitle()}</h2>
-            {totalUnread > 0 && (
-              <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full animate-pulse">
-                {totalUnread} yeni
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Ses butonu */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* ✅ Sidebar - Mobilde slide ediyor */}
+        <div 
+          className={`
+            lg:relative lg:w-64 lg:flex lg:flex-col
+            fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200
+            transform transition-transform duration-300 ease-in-out
+            ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+            lg:translate-x-0
+          `}
+        >
+          {/* Mobil kapatma butonu */}
+          <div className="lg:hidden flex items-center justify-between p-4 border-b border-gray-200">
+            <h2 className="text-lg font-bold text-gray-900">💬 Sohbetler</h2>
             <button
-              onClick={() => setSoundEnabled(!soundEnabled)}
-              className={`p-2 rounded-lg transition-colors ${
-                soundEnabled ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
-              }`}
-              title={soundEnabled ? 'Sesi kapat' : 'Sesi aç'}
+              onClick={() => setSidebarOpen(false)}
+              className="p-2 rounded-lg hover:bg-gray-100"
             >
-              {soundEnabled ? (
-                <BellIcon className="h-5 w-5" />
-              ) : (
-                <BellSlashIcon className="h-5 w-5" />
-              )}
+              <XMarkIcon className="h-6 w-6 text-gray-600" />
             </button>
-            
-            {/* Bildirim butonu */}
-            <button
-              onClick={() => setNotificationEnabled(!notificationEnabled)}
-              className={`p-2 rounded-lg transition-colors ${
-                notificationEnabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
-              }`}
-              title={notificationEnabled ? 'Bildirimleri kapat' : 'Bildirimleri aç'}
-            >
-              {notificationEnabled ? '🔔' : '🔕'}
-            </button>
-
-            {/* Tümünü okundu işaretle */}
-            {totalUnread > 0 && (
-              <button
-                onClick={() => {
-                  if (chatType === 'general') {
-                    markAllAsRead('general');
-                  } else if (chatType === 'private' && selectedUser) {
-                    markAllAsRead('private', selectedUser);
-                  } else if (chatType === 'group' && selectedGroup) {
-                    markAllAsRead('group', selectedGroup);
-                  }
-                  toast.success('Tüm mesajlar okundu olarak işaretlendi');
-                }}
-                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-              >
-                Tümünü Okundu İşaretle
-              </button>
-            )}
           </div>
-        </div>
 
-        {/* ✅ Mesaj Listesi */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50" ref={messagesContainerRef}>
-          {messages.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-gray-400">Henüz mesaj yok</p>
-              <p className="text-sm text-gray-300 mt-1">İlk mesajı sen gönder!</p>
+          {/* Sidebar içeriği */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="hidden lg:block p-4 border-b border-gray-200">
+              <h2 className="text-lg font-bold text-gray-900">💬 Sohbetler</h2>
             </div>
-          ) : (
-            // ✅ Mesajları göster (EN ALTA EN YENİ)
-            messages.map((message) => {
-              const isOwn = message.sender?._id === user._id;
-              const unread = isUnread(message);
-              
+            {activeChats.map((chat) => {
+              const unread = getUnreadCount(chat.id);
               return (
-                <div
-                  key={message._id}
-                  className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-slideIn`}
+                <button
+                  key={chat.id}
+                  onClick={() => changeChat(chat)}
+                  className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between ${
+                    (chatType === 'general' && chat.type === 'general') ||
+                    (chatType === 'private' && chat.type === 'private' && selectedUser === chat.id) ||
+                    (chatType === 'group' && chat.type === 'group' && selectedGroup === chat.id)
+                      ? 'bg-blue-50 border-r-4 border-blue-500'
+                      : ''
+                  }`}
                 >
-                  <div
-                    className={`max-w-[70%] rounded-2xl px-4 py-2.5 ${
-                      isOwn
-                        ? 'bg-blue-500 text-white'
-                        : unread
-                        ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400' // ✅ OKUNMAMIŞ
-                        : 'bg-white text-gray-900 border border-gray-200'
-                    }`}
-                  >
-                    {/* Gönderen bilgisi */}
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-medium opacity-80">
-                        {isOwn ? 'Ben' : message.sender?.name || 'Kullanıcı'}
-                      </span>
-                      {unread && (
-                        <span className="text-xs bg-yellow-400 text-black px-2 py-0.5 rounded-full font-bold animate-pulse">
-                          ● YENİ
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Mesaj içeriği */}
-                    <p className="text-sm break-words">{message.content}</p>
-
-                    {/* Zaman */}
-                    <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
-                      {new Date(message.createdAt).toLocaleString('tr-TR', {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric'
-                      })}
-                    </p>
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="text-xl flex-shrink-0">{chat.icon}</span>
+                    <span className="text-sm font-medium text-gray-700 truncate">
+                      {chat.name}
+                    </span>
                   </div>
-                </div>
+                  {unread > 0 && (
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">
+                      {unread}
+                    </span>
+                  )}
+                </button>
               );
-            })
-          )}
-          <div ref={messagesEndRef} />
+            })}
+          </div>
         </div>
 
-        {/* ✅ Mesaj Gönderme */}
-        <div className="bg-white border-t border-gray-200 p-4">
-          <form onSubmit={handleSendMessage} className="flex gap-3">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Mesajınızı yazın..."
-              className="flex-1 input-field"
-              disabled={sending}
-            />
-            <button
-              type="submit"
-              disabled={!newMessage.trim() || sending}
-              className="btn-primary px-6 flex items-center gap-2"
-            >
-              <PaperAirplaneIcon className="h-5 w-5" />
-              {sending ? 'Gönderiliyor...' : 'Gönder'}
-            </button>
-          </form>
+        {/* ✅ Mobil overlay */}
+        {sidebarOpen && (
+          <div 
+            className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        {/* ✅ Ana Sohbet Alanı */}
+        <div className="flex-1 flex flex-col min-w-0 bg-gray-50">
+          {/* ✅ Desktop Başlık - Mobilde gizli */}
+          <div className="hidden lg:flex bg-white border-b border-gray-200 px-6 py-4 items-center justify-between">
+            <div className="flex items-center gap-3 min-w-0">
+              <h2 className="text-xl font-bold text-gray-900 truncate">{getChatTitle()}</h2>
+              {totalUnread > 0 && (
+                <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0">
+                  {totalUnread} yeni
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <button
+                onClick={() => setSoundEnabled(!soundEnabled)}
+                className={`p-2 rounded-lg transition-colors ${
+                  soundEnabled ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {soundEnabled ? (
+                  <BellIcon className="h-5 w-5" />
+                ) : (
+                  <BellSlashIcon className="h-5 w-5" />
+                )}
+              </button>
+              
+              <button
+                onClick={() => setNotificationEnabled(!notificationEnabled)}
+                className={`p-2 rounded-lg transition-colors ${
+                  notificationEnabled ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {notificationEnabled ? '🔔' : '🔕'}
+              </button>
+
+              {totalUnread > 0 && (
+                <button
+                  onClick={() => {
+                    if (chatType === 'general') {
+                      markAllAsRead('general');
+                    } else if (chatType === 'private' && selectedUser) {
+                      markAllAsRead('private', selectedUser);
+                    } else if (chatType === 'group' && selectedGroup) {
+                      markAllAsRead('group', selectedGroup);
+                    }
+                    toast.success('Tüm mesajlar okundu olarak işaretlendi');
+                  }}
+                  className="text-sm text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
+                >
+                  Tümünü Okundu İşaretle
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ✅ Mesaj Listesi */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={messagesContainerRef}>
+            {messages.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-400">Henüz mesaj yok</p>
+                <p className="text-sm text-gray-300 mt-1">İlk mesajı sen gönder!</p>
+              </div>
+            ) : (
+              messages.map((message) => {
+                const isOwn = message.sender?._id === user._id;
+                const unread = isUnread(message);
+                
+                return (
+                  <div
+                    key={message._id}
+                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-slideIn`}
+                  >
+                    <div
+                      className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 ${
+                        isOwn
+                          ? 'bg-blue-500 text-white'
+                          : unread
+                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400'
+                          : 'bg-white text-gray-900 border border-gray-200'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <span className="text-xs font-medium opacity-80">
+                          {isOwn ? 'Ben' : message.sender?.name || 'Kullanıcı'}
+                        </span>
+                        {unread && (
+                          <span className="text-xs bg-yellow-400 text-black px-2 py-0.5 rounded-full font-bold">
+                            ● YENİ
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-sm break-words">{message.content}</p>
+
+                      <p className={`text-[10px] mt-1 ${isOwn ? 'text-blue-100' : 'text-gray-400'}`}>
+                        {new Date(message.createdAt).toLocaleString('tr-TR', {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                          day: '2-digit',
+                          month: '2-digit',
+                          year: 'numeric'
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* ✅ Mesaj Gönderme */}
+          <div className="bg-white border-t border-gray-200 p-3 sm:p-4">
+            <form onSubmit={handleSendMessage} className="flex gap-2 sm:gap-3">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                placeholder="Mesajınızı yazın..."
+                className="flex-1 input-field text-sm sm:text-base"
+                disabled={sending}
+              />
+              <button
+                type="submit"
+                disabled={!newMessage.trim() || sending}
+                className="btn-primary px-4 sm:px-6 py-2 flex items-center gap-2 text-sm sm:text-base"
+              >
+                <PaperAirplaneIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                <span className="hidden sm:inline">{sending ? 'Gönderiliyor...' : 'Gönder'}</span>
+                <span className="sm:hidden">{sending ? '...' : '➤'}</span>
+              </button>
+            </form>
+          </div>
         </div>
       </div>
     </div>
