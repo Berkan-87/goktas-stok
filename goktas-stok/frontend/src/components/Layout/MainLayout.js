@@ -27,7 +27,7 @@ const MainLayout = () => {
     { name: 'Stoklar', icon: CubeIcon, path: '/stoklar' },
     { name: 'Siparişler', icon: ClipboardDocumentListIcon, path: '/uretim' },
     { name: 'Transfer', icon: ArrowsRightLeftIcon, path: '/transfer' },
-    { name: 'Sohbet', icon: ChatBubbleLeftRightIcon, path: '/sohbet' },
+    { name: 'İletişim', icon: ChatBubbleLeftRightIcon, path: '/sohbet' },
     { name: 'Geçmiş', icon: ClockIcon, path: '/gecmis' },
   ];
 
@@ -63,7 +63,10 @@ const MainLayout = () => {
         } lg:translate-x-0 lg:static lg:inset-0 flex flex-col h-full`}
       >
         <div className="p-6 border-b border-gray-200 shrink-0">
-          <h1 className="text-2xl font-bold text-blue-600">🚪 Göktaş Stok</h1>
+          <h1 className="text-lg font-bold text-blue-600 flex items-center gap-2">
+            <img src="/logo192.png" alt="Göktaş Stok Logo" className="h-6 w-6 object-contain" />
+            GÖKTAŞ KAPI
+          </h1>
           <p className="text-sm text-gray-500 mt-1">{user?.name}</p>
         </div>
 
