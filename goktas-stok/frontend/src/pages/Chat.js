@@ -9,8 +9,7 @@ import {
   BellSlashIcon,
   Bars3Icon,
   XMarkIcon,
-  MagnifyingGlassIcon,
-  CheckBadgeIcon
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 
 const Chat = () => {
@@ -33,9 +32,7 @@ const Chat = () => {
   const [isMarkingRead, setIsMarkingRead] = useState(false);
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
-  const audioRef = useRef(null);
   const isFirstLoad = useRef(true);
-  const lastMessageIdRef = useRef(null);
 
   // ✅ Ses çalma
   const playSound = () => {
@@ -61,6 +58,7 @@ const Chat = () => {
   const showNotification = (message) => {
     if (!notificationEnabled) return;
     
+    // Tarayıcı bildirimi
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('💬 Yeni Mesaj', {
         body: `${message.sender?.name || 'Kullanıcı'}: ${message.content}`,
@@ -70,6 +68,7 @@ const Chat = () => {
       });
     }
 
+    // Toast bildirimi
     toast.custom((t) => (
       <div
         className={`${
@@ -118,12 +117,12 @@ const Chat = () => {
     }
   }, []);
 
-  // ✅ Kullanıcıları ve grupları getir
+  // ✅ Kullanıcıları ve grupları getir - HER 10 SANİYEDE BİR YENİLE
   useEffect(() => {
     fetchUsersAndGroups();
     const interval = setInterval(() => {
       fetchUsersAndGroups();
-    }, 30000);
+    }, 10000); // ✅ 10 saniyede bir yenile
     return () => clearInterval(interval);
   }, []);
 
@@ -135,6 +134,16 @@ const Chat = () => {
       ]);
       
       const filteredUsers = usersRes.data.filter(u => u._id !== user._id);
+      
+      // ✅ Kullanıcı listesi değişti mi kontrol et
+      const currentUserIds = users.map(u => u._id).sort().join(',');
+      const newUserIds = filteredUsers.map(u => u._id).sort().join(',');
+      
+      if (currentUserIds !== newUserIds) {
+        console.log('📱 Kullanıcı listesi güncellendi:', filteredUsers.length);
+        toast.success('📱 Kullanıcı listesi güncellendi', { icon: '🔄' });
+      }
+      
       setUsers(filteredUsers);
       setGroups(groupsRes.data);
       
@@ -188,29 +197,26 @@ const Chat = () => {
       const response = await axios.get('/messages/general');
       const newMessages = response.data;
       
-      // ✅ Yeni mesaj kontrolü
+      // ✅ YENİ MESAJ KONTROLÜ - Herkese bildirim gitmeli
       if (!isFirstLoad.current && messages.length > 0 && newMessages.length > messages.length) {
         const newMsg = newMessages[newMessages.length - 1];
         if (newMsg.sender?._id !== user._id) {
+          // ✅ BİLDİRİM GÖNDER
           showNotification(newMsg);
           playSound();
-          // ✅ Okunmamış mesaj var, listeyi güncelle
-          setMessages(newMessages);
-          // ✅ Okunmamış mesajları otomatik okuma (sohbetteysen)
+          
+          // ✅ Eğer genel sohbetteysen otomatik okuma
           if (chatType === 'general') {
             await markAllAsRead('general');
           }
-        } else {
-          setMessages(newMessages);
         }
-      } else {
-        setMessages(newMessages);
       }
       
+      setMessages(newMessages);
       isFirstLoad.current = false;
       scrollToBottom();
     } catch (error) {
-      toast.error('Mesajlar alınamadı');
+      console.error('Mesajlar alınamadı:', error);
     } finally {
       setLoading(false);
     }
@@ -227,19 +233,16 @@ const Chat = () => {
         if (newMsg.sender?._id !== user._id) {
           showNotification(newMsg);
           playSound();
-          setMessages(newMessages);
+          // ✅ Özel sohbette otomatik okuma
           await markAllAsRead('private', userId);
-        } else {
-          setMessages(newMessages);
         }
-      } else {
-        setMessages(newMessages);
       }
       
+      setMessages(newMessages);
       isFirstLoad.current = false;
       scrollToBottom();
     } catch (error) {
-      toast.error('Mesajlar alınamadı');
+      console.error('Mesajlar alınamadı:', error);
     } finally {
       setLoading(false);
     }
@@ -256,19 +259,15 @@ const Chat = () => {
         if (newMsg.sender?._id !== user._id) {
           showNotification(newMsg);
           playSound();
-          setMessages(newMessages);
           await markAllAsRead('group', groupId);
-        } else {
-          setMessages(newMessages);
         }
-      } else {
-        setMessages(newMessages);
       }
       
+      setMessages(newMessages);
       isFirstLoad.current = false;
       scrollToBottom();
     } catch (error) {
-      toast.error('Mesajlar alınamadı');
+      console.error('Mesajlar alınamadı:', error);
     } finally {
       setLoading(false);
     }
@@ -301,7 +300,6 @@ const Chat = () => {
       
       await axios.put('/messages/mark-all-read', payload);
       
-      // ✅ UI'da güncelle - tüm mesajları okundu yap
       setMessages(prev => prev.map(m => {
         if (!m.readBy?.includes(user._id) && m.sender?._id !== user._id) {
           return {
@@ -391,7 +389,6 @@ const Chat = () => {
       const response = await axios.post('/messages', payload);
       const newMsg = response.data;
       
-      // ✅ Gönderen mesajı otomatik okundu
       newMsg.readBy = [user._id];
       
       setMessages(prev => [...prev, newMsg]);
@@ -441,7 +438,7 @@ const Chat = () => {
     updateUnreadCounts();
   }, [messages, activeChats]);
 
-  // ✅ Otomatik yenileme (3 saniye)
+  // ✅ Otomatik yenileme - 3 saniye
   useEffect(() => {
     const interval = setInterval(() => {
       if (chatType === 'general') {
@@ -496,15 +493,6 @@ const Chat = () => {
   // ✅ Toplam okunmamış mesaj sayısı
   const totalUnread = messages.filter(m => isUnread(m)).length;
 
-  // ✅ Okunmamış mesajları en üste al (WhatsApp/Gmail tarzı)
-  const sortedMessages = [...messages].sort((a, b) => {
-    const aUnread = isUnread(a);
-    const bUnread = isUnread(b);
-    if (aUnread && !bUnread) return -1;
-    if (!aUnread && bUnread) return 1;
-    return new Date(a.createdAt) - new Date(b.createdAt);
-  });
-
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] bg-gray-50 rounded-xl shadow-lg overflow-hidden">
       
@@ -519,7 +507,7 @@ const Chat = () => {
         <h2 className="text-lg font-bold text-gray-900 truncate">{getChatTitle()}</h2>
         <div className="flex items-center gap-2">
           {totalUnread > 0 && (
-            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full animate-pulse">
+            <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
               {totalUnread}
             </span>
           )}
@@ -549,7 +537,21 @@ const Chat = () => {
 
           <div className="flex-1 overflow-y-auto">
             <div className="hidden lg:block p-4 border-b border-gray-200">
-              <h2 className="text-lg font-bold text-gray-900">💬 Sohbetler</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold text-gray-900">💬 Sohbetler</h2>
+                <button
+                  onClick={() => {
+                    fetchUsersAndGroups();
+                    toast.success('📱 Kullanıcı listesi yenilendi');
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors"
+                  title="Listeyi yenile"
+                >
+                  <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                </button>
+              </div>
               <p className="text-xs text-gray-500 mt-1">
                 {activeChats.length - 1} kişiyle sohbet edebilirsin
               </p>
@@ -601,7 +603,7 @@ const Chat = () => {
                     </div>
                   </div>
                   {unread > 0 && (
-                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0 animate-pulse">
+                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full flex-shrink-0">
                       {unread}
                     </span>
                   )}
@@ -632,7 +634,7 @@ const Chat = () => {
             <div className="flex items-center gap-3 min-w-0">
               <h2 className="text-xl font-bold text-gray-900 truncate">{getChatTitle()}</h2>
               {totalUnread > 0 && (
-                <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full animate-pulse flex-shrink-0">
+                <span className="bg-red-500 text-white text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0">
                   {totalUnread} yeni
                 </span>
               )}
@@ -660,19 +662,6 @@ const Chat = () => {
                 {notificationEnabled ? '🔔' : '🔕'}
               </button>
 
-              <button
-                onClick={() => {
-                  fetchUsersAndGroups();
-                  toast.success('Sohbet listesi yenilendi');
-                }}
-                className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-                title="Listeyi yenile"
-              >
-                <svg className="h-5 w-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-              </button>
-
               {totalUnread > 0 && (
                 <button
                   onClick={() => {
@@ -693,15 +682,15 @@ const Chat = () => {
             </div>
           </div>
 
-          {/* ✅ Mesaj Listesi - OKUNMAMIŞLAR EN ÜSTTE */}
+          {/* ✅ Mesaj Listesi - YANIP SÖNME YOK */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={messagesContainerRef}>
-            {sortedMessages.length === 0 ? (
+            {messages.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-400">Henüz mesaj yok</p>
                 <p className="text-sm text-gray-300 mt-1">İlk mesajı sen gönder!</p>
               </div>
             ) : (
-              sortedMessages.map((message) => {
+              messages.map((message) => {
                 const isOwn = message.sender?._id === user._id;
                 const unread = isUnread(message);
                 
@@ -709,14 +698,14 @@ const Chat = () => {
                   <div
                     key={message._id}
                     onClick={() => handleMessageClick(message)}
-                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} animate-slideIn cursor-pointer`}
+                    className={`flex ${isOwn ? 'justify-end' : 'justify-start'} cursor-pointer`}
                   >
                     <div
                       className={`max-w-[85%] sm:max-w-[70%] rounded-2xl px-4 py-2.5 transition-all ${
                         isOwn
                           ? 'bg-blue-500 text-white'
                           : unread
-                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400 hover:ring-3' // ✅ OKUNMAMIŞ - KOYU
+                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400' // ✅ KOYU RENK - YANIP SÖNME YOK
                           : 'bg-white text-gray-900 border border-gray-200 hover:shadow-md'
                       }`}
                     >
@@ -725,8 +714,8 @@ const Chat = () => {
                           {isOwn ? 'Ben' : message.sender?.name || 'Kullanıcı'}
                         </span>
                         {unread && (
-                          <span className="text-xs bg-yellow-400 text-black px-2 py-0.5 rounded-full font-bold animate-pulse">
-                            ● YENİ
+                          <span className="text-xs bg-yellow-400 text-black px-2 py-0.5 rounded-full font-bold">
+                            YENİ
                           </span>
                         )}
                         {!unread && !isOwn && (
