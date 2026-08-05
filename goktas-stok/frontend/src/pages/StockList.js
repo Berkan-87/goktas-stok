@@ -176,29 +176,24 @@ const StockList = () => {
     return Math.min(percentage, 100);
   };
 
-  // ✅ Ürünün rengini bul - DÜZELTİLDİ (Büyük/küçük harf duyarsız)
+  // ✅ Ürünün rengini bul
   const getProductColor = (product) => {
     const name = product.name.toUpperCase();
     const code = product.code?.toUpperCase() || '';
     
-    // ÖNCE TAŞ GRİ KONTROL ET (en spesifik)
     if (name.includes('TAŞ') || name.includes('TAS') || name.includes('TG')) {
       return 'tas_gri';
     }
-    // SONRA KOYU GRİ
     if (name.includes('KOYU') || name.includes('KG')) {
       return 'koyu_gri';
     }
-    // SONRA AÇIK GRİ
     if (name.includes('AÇIK') || name.includes('ACIK') || name.includes('AG')) {
       return 'acik_gri';
     }
-    // SONRA BUTE BEYAZ
     if (name.includes('BUTE') || name.includes('BEYAZ') || name.includes('BB')) {
       return 'bute_beyaz';
     }
     
-    // Eğer hiçbiri yoksa null dön
     return null;
   };
 
@@ -216,17 +211,15 @@ const StockList = () => {
     return groups;
   };
 
-  // ✅ Kasa Takım renklerine göre grupla - DÜZELTİLDİ
+  // ✅ Kasa Takım renklerine göre grupla
   const groupProductsByKasaColor = () => {
     const filteredProducts = products.filter(p => p.category === 'kasa');
     const groups = {};
     
-    // Her renk için boş bir dizi oluştur
     kasaColors.forEach(color => {
       groups[color.label] = [];
     });
 
-    // Ürünleri renklerine göre doldur
     filteredProducts.forEach(product => {
       const colorId = getProductColor(product);
       
@@ -238,14 +231,12 @@ const StockList = () => {
         }
       }
       
-      // Eğer renk bulunamadıysa "Diğer" grubuna ekle
       if (!groups['Diğer']) {
         groups['Diğer'] = [];
       }
       groups['Diğer'].push(product);
     });
 
-    // Boş renk gruplarını kaldır
     const result = {};
     Object.keys(groups).forEach(key => {
       if (groups[key].length > 0) {
@@ -263,13 +254,13 @@ const StockList = () => {
     }));
   };
 
-  // ✅ Kanat Grup Kartı
+  // ✅ Kanat Grup Kartı - GÖLGE DÜZELTİLDİ
   const KanatGroupCard = ({ groupName, products: groupProducts }) => {
     const isExpanded = expandedGroups[groupName] !== false;
     const totalStock = groupProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
 
     return (
-      <div className="bg-white rounded-xl shadow-md overflow-hidden border-l-4 border-blue-500 shadow-lg hover:shadow-xl transition-shadow duration-300">
+      <div className="bg-white rounded-xl shadow-md overflow-hidden border-l-4 border-blue-500 hover:shadow-lg transition-shadow duration-300">
         <div 
           className="flex items-center justify-between p-4 bg-gradient-to-r from-blue-50 to-blue-100 cursor-pointer hover:opacity-90 transition-opacity"
           onClick={() => toggleGroup(groupName)}
@@ -308,7 +299,7 @@ const StockList = () => {
     );
   };
 
-  // ✅ Kasa Takım Renk Kartı
+  // ✅ Kasa Takım Renk Kartı - GÖLGE DÜZELTİLDİ
   const KasaColorCard = ({ colorLabel, products: colorProducts }) => {
     const isExpanded = expandedGroups[colorLabel] !== false;
     const totalStock = colorProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
@@ -317,7 +308,7 @@ const StockList = () => {
     const isAcikGri = colorLabel === 'Açık Gri';
 
     return (
-      <div className="bg-white rounded-xl shadow-md overflow-hidden border-l-4 border-purple-500 shadow-lg hover:shadow-xl transition-shadow duration-300">
+      <div className="bg-white rounded-xl shadow-md overflow-hidden border-l-4 border-purple-500 hover:shadow-lg transition-shadow duration-300">
         <div 
           className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-purple-100 cursor-pointer hover:opacity-90 transition-opacity"
           onClick={() => toggleGroup(colorLabel)}
@@ -552,16 +543,13 @@ const StockList = () => {
       orderedKasaGroups[color.label] = kasaGroups[color.label];
     }
   });
-  // Diğer grubunu ekle
   if (kasaGroups['Diğer'] && kasaGroups['Diğer'].length > 0) {
     orderedKasaGroups['Diğer'] = kasaGroups['Diğer'];
   }
 
-  // 📊 Toplam sayılar
   const kanatCount = products.filter(p => p.category === 'kanat').length;
   const kasaCount = products.filter(p => p.category === 'kasa').length;
 
-  // ✅ Loading kontrolü
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -605,7 +593,7 @@ const StockList = () => {
         </div>
       </div>
 
-      {/* 🎯 Kategori Sekmeleri */}
+      {/* Kategori Sekmeleri */}
       <div className="flex gap-2 border-b border-gray-200">
         <button
           onClick={() => setActiveTab('kanat')}
@@ -635,10 +623,9 @@ const StockList = () => {
         </button>
       </div>
 
-      {/* 📋 Kategori İçeriği */}
+      {/* Kategori İçeriği */}
       <div className="space-y-4">
         {activeTab === 'kanat' ? (
-          // KANAT GRUPLARI
           Object.keys(kanatGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
               <p className="text-lg text-gray-500">🚪 Kanat kategorisinde ürün bulunmuyor</p>
@@ -654,7 +641,6 @@ const StockList = () => {
             ))
           )
         ) : (
-          // KASA TAKIM RENK GRUPLARI
           Object.keys(orderedKasaGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
               <p className="text-lg text-gray-500">🪟 Kasa Takım kategorisinde ürün bulunmuyor</p>
