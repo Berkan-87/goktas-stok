@@ -20,7 +20,7 @@ const Transfer = () => {
   const [transfers, setTransfers] = useState([]);
   const [pendingTransfers, setPendingTransfers] = useState([]);
   const [activeTab, setActiveTab] = useState('request');
-  
+
   const [formData, setFormData] = useState({
     sourceBranch: 'fabrika',
     targetBranch: user?.branch || '',
@@ -28,10 +28,10 @@ const Transfer = () => {
     quantity: '',
     note: ''
   });
-  
+
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
-  
+
   const branches = [
     { value: 'fabrika', label: '🏭 Fabrika' },
     { value: 'karabaglar', label: '🏘️ Karabağlar' },
@@ -59,7 +59,7 @@ const Transfer = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      
+
       // Token kontrolü
       const token = localStorage.getItem('token');
       if (!token) {
@@ -75,23 +75,23 @@ const Transfer = () => {
         axios.get('/transfers'),
         axios.get('/transfers/pending')
       ]);
-      
+
       console.log('📦 Gelen ürünler:', productsRes.data);
       console.log(`📦 Ürün sayısı: ${productsRes.data?.length || 0}`);
-      
+
       // ✅ State'leri güncelle - her zaman dizi olarak
       setProducts(productsRes.data || []);
       setStocks(stocksRes.data || []);
       setTransfers(transfersRes.data || []);
       setPendingTransfers(pendingRes.data || []);
-      
+
       // ✅ Ürün yoksa uyarı
       if (!productsRes.data || productsRes.data.length === 0) {
         toast.error('⚠️ Sistemde hiç ürün bulunmuyor! Lütfen önce ürün ekleyin.');
       } else {
         toast.success(`✅ ${productsRes.data.length} ürün yüklendi`);
       }
-      
+
     } catch (error) {
       console.error('❌ Veri çekme hatası:', error);
       console.error('Hata detayı:', error.response?.data || error.message);
@@ -114,22 +114,22 @@ const Transfer = () => {
 
   const handleRequest = async (e) => {
     e.preventDefault();
-    
+
     if (!formData.targetBranch) {
       toast.error('Hedef şube seçiniz');
       return;
     }
-    
+
     if (!formData.productId) {
       toast.error('Ürün seçiniz');
       return;
     }
-    
+
     if (!formData.quantity || formData.quantity <= 0) {
       toast.error('Geçerli bir miktar giriniz');
       return;
     }
-    
+
     const factoryStock = getFactoryStock();
     if (formData.quantity > factoryStock) {
       toast.error(`Fabrikada yeterli stok yok! Mevcut: ${factoryStock} adet`);
@@ -144,19 +144,19 @@ const Transfer = () => {
         quantity: parseInt(formData.quantity),
         note: formData.note
       });
-      
+
       toast.success('✅ Transfer talebi oluşturuldu! Fabrika onayı bekleniyor.');
-      
+
       setFormData({
         ...formData,
         productId: '',
         quantity: '',
         note: ''
       });
-      
+
       fetchData();
       setActiveTab('pending');
-      
+
     } catch (error) {
       toast.error(error.response?.data?.message || 'Talep oluşturulamadı');
     }
@@ -164,7 +164,7 @@ const Transfer = () => {
 
   const handleApprove = async (transferId) => {
     if (!window.confirm('Bu transfer talebini onaylamak istediğinize emin misiniz?')) return;
-    
+
     try {
       await axios.put(`/transfers/${transferId}/approve`);
       toast.success('✅ Transfer onaylandı ve stoklar güncellendi!');
@@ -177,7 +177,7 @@ const Transfer = () => {
   const handleReject = async (transferId) => {
     const reason = prompt('Reddetme sebebini girin:');
     if (reason === null) return;
-    
+
     try {
       await axios.put(`/transfers/${transferId}/reject`, { reason });
       toast.success('Transfer reddedildi');
@@ -189,7 +189,7 @@ const Transfer = () => {
 
   const handleComplete = async (transferId) => {
     if (!window.confirm('Transferi teslim aldığınızı onaylıyor musunuz?')) return;
-    
+
     try {
       await axios.put(`/transfers/${transferId}/complete`);
       toast.success('✔️ Transfer tamamlandı! Stoklar güncellendi.');
@@ -201,7 +201,7 @@ const Transfer = () => {
 
   const handleCancel = async (transferId) => {
     if (!window.confirm('Bu transfer talebini iptal etmek istediğinize emin misiniz?')) return;
-    
+
     try {
       await axios.put(`/transfers/${transferId}/cancel`);
       toast.success('Transfer iptal edildi');
@@ -213,18 +213,18 @@ const Transfer = () => {
 
   const getFilteredTransfers = () => {
     let filtered = transfers;
-    
+
     if (selectedStatus !== 'all') {
       filtered = filtered.filter(t => t.status === selectedStatus);
     }
-    
+
     if (selectedBranch !== 'all') {
-      filtered = filtered.filter(t => 
-        t.sourceBranch === selectedBranch || 
+      filtered = filtered.filter(t =>
+        t.sourceBranch === selectedBranch ||
         t.targetBranch === selectedBranch
       );
     }
-    
+
     return filtered;
   };
 
@@ -279,22 +279,20 @@ const Transfer = () => {
       <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab('request')}
-          className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap ${
-            activeTab === 'request'
+          className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'request'
               ? 'text-blue-600 border-b-2 border-blue-600'
               : 'text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           📝 Talep Oluştur
         </button>
         {isFabrika && (
           <button
             onClick={() => setActiveTab('pending')}
-            className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap relative ${
-              activeTab === 'pending'
+            className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap relative ${activeTab === 'pending'
                 ? 'text-yellow-600 border-b-2 border-yellow-600'
                 : 'text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             ⏳ Bekleyen Talepler
             {pendingTransfers.length > 0 && (
@@ -306,11 +304,10 @@ const Transfer = () => {
         )}
         <button
           onClick={() => setActiveTab('history')}
-          className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap ${
-            activeTab === 'history'
+          className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap ${activeTab === 'history'
               ? 'text-gray-900 border-b-2 border-gray-900'
               : 'text-gray-500 hover:text-gray-700'
-          }`}
+            }`}
         >
           📋 Transfer Geçmişi
         </button>
@@ -322,7 +319,7 @@ const Transfer = () => {
           <h2 className="text-lg font-semibold text-gray-900 mb-4">
             {isFabrika ? '📦 Stok Transferi (Fabrika → Şube)' : '📦 Fabrikadan Ürün Talebi'}
           </h2>
-          
+
           <form onSubmit={handleRequest} className="space-y-5">
             {isFabrika && (
               <div>
@@ -384,9 +381,9 @@ const Transfer = () => {
                     const stock = getProductStock(product._id, 'fabrika');
                     return (
                       <option key={product._id} value={product._id}>
-                        {product.name} 
-                        {product.category === 'kanat' ? ' 🚪' : 
-                         product.category === 'kasa' ? ' 🪟' : ' 🎯'}
+                        {product.name}
+                        {product.category === 'kanat' ? ' 🚪' :
+                          product.category === 'kasa' ? ' 🪟' : ' 🎯'}
                         {' - '}Fabrika: {stock} adet
                         {stock === 0 && ' ⚠️ Stok yok'}
                       </option>
@@ -396,7 +393,7 @@ const Transfer = () => {
                   <option value="" disabled>⚠️ Hiç ürün bulunamadı</option>
                 )}
               </select>
-              
+
               {/* ✅ Debug - Kaç ürün var? */}
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-xs text-gray-400">
@@ -415,7 +412,7 @@ const Transfer = () => {
                   </button>
                 )}
               </div>
-              
+
               {(!products || products.length === 0) && (
                 <p className="text-sm text-red-500 mt-1">
                   ⚠️ Sistemde hiç ürün yok! Lütfen önce ürün ekleyin.
@@ -610,7 +607,7 @@ const Transfer = () => {
               {getFilteredTransfers().map((transfer) => {
                 const statusBadge = getStatusBadge(transfer.status);
                 const StatusIcon = statusBadge.icon;
-                
+
                 return (
                   <div key={transfer._id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
