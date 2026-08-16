@@ -1,4 +1,4 @@
-// src/pages/Dashboard.js
+// frontend/src/pages/Dashboard.js
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import axios from '../utils/axios';
@@ -155,67 +155,36 @@ const Dashboard = () => {
     try {
       const startDate = getDateRangeFilter();
       
-      const [productsRes, stockRes, historyRes] = await Promise.all([
+      // ✅ SADECE products ve stock çağır - history'yi KALDIR
+      const [productsRes, stockRes] = await Promise.all([
         axios.get('/products'),
-        axios.get('/stock'),
-        axios.get(`/history?limit=1000&startDate=${startDate}`)
+        axios.get('/stock')
       ]);
 
       const stocks = stockRes.data;
-      const history = historyRes.data;
       
       // ✅ Sadece kanat ürünleri
-      const kanatStocks = stocks.filter(s => s.productId?.category === 'kanat');
       const kanatProducts = productsRes.data.filter(p => p.category === 'kanat');
       const kanatProductIds = new Set(kanatProducts.map(p => p._id));
       
       // ✅ Seçili şube stoku
-      const branchKanatStocks = kanatStocks.filter(s => s.branch === selectedBranch);
+      const branchKanatStocks = stocks.filter(s => 
+        s.branch === selectedBranch && 
+        kanatProductIds.has(s.productId?._id)
+      );
       const totalStock = branchKanatStocks.reduce((sum, s) => sum + s.quantity, 0);
       
       // ✅ Düşük stok
       const CRITICAL_LEVEL = 50;
-      const allLowStock = stocks.filter(s => s.quantity <= CRITICAL_LEVEL && s.quantity > 0);
+      const allLowStock = stocks.filter(s => 
+        s.quantity <= CRITICAL_LEVEL && 
+        s.quantity > 0 &&
+        kanatProductIds.has(s.productId?._id)
+      );
       const branchLowStock = allLowStock.filter(s => s.branch === selectedBranch);
       
-      // ✅ Çıkış işlemleri
-      const outgoingTransactions = history.filter(t => t.type === 'out');
-      const branchOutgoing = outgoingTransactions.filter(t => t.branch === selectedBranch);
-      
-      // ✅ Toplam çıkış
-      const totalOutgoing = branchOutgoing
-        .filter(t => kanatProductIds.has(t.productId?._id))
-        .reduce((sum, t) => sum + t.quantity, 0);
-
-      setStats({
-        totalProducts: kanatProducts.length,
-        totalStock,
-        lowStock: branchLowStock.length,
-        totalOutgoing
-      });
-
-      // ✅ Düşük stok listesi
-      const sortedLowItems = branchLowStock
-        .sort((a, b) => a.quantity - b.quantity)
-        .slice(0, 10);
-      setLowStockItems(sortedLowItems);
-
-      // ✅ Model bazlı çıkış
-      const modelOutgoing = {};
+      // ✅ Model bazlı stok
       const modelStockData = {};
-
-      branchOutgoing.forEach(t => {
-        if (!kanatProductIds.has(t.productId?._id)) return;
-        
-        const productName = t.productId?.name || 'Bilinmeyen';
-        const cleanName = productName.replace(/\s*(87|77|Camlı|Camli|Cam)\s*$/i, '').trim();
-        
-        if (!modelOutgoing[cleanName]) {
-          modelOutgoing[cleanName] = 0;
-        }
-        modelOutgoing[cleanName] += t.quantity;
-      });
-
       branchKanatStocks.forEach(s => {
         const productName = s.productId?.name || 'Bilinmeyen';
         const cleanName = productName.replace(/\s*(87|77|Camlı|Camli|Cam)\s*$/i, '').trim();
@@ -226,17 +195,31 @@ const Dashboard = () => {
         modelStockData[cleanName] += s.quantity;
       });
 
-      const sortedModelData = Object.entries(modelOutgoing)
+      setStats({
+        totalProducts: kanatProducts.length,
+        totalStock,
+        lowStock: branchLowStock.length,
+        totalOutgoing: 0 // Geçici olarak 0
+      });
+
+      // ✅ Düşük stok listesi
+      const sortedLowItems = branchLowStock
+        .sort((a, b) => a.quantity - b.quantity)
+        .slice(0, 10);
+      setLowStockItems(sortedLowItems);
+
+      // ✅ Model bazlı veri
+      const sortedModelData = Object.entries(modelStockData)
         .map(([model, quantity]) => ({
           model,
-          quantity,
-          currentStock: modelStockData[model] || 0,
+          quantity: 0, // Çıkış yok
+          currentStock: quantity,
           status: quantity > 200 ? 'Yüksek' : quantity > 100 ? 'Orta' : 'Düşük',
           statusColor: quantity > 200 ? 'bg-green-100 text-green-700' : 
                        quantity > 100 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700',
           statusDot: quantity > 200 ? '🟢' : quantity > 100 ? '🟡' : '🔴'
         }))
-        .sort((a, b) => b.quantity - a.quantity);
+        .sort((a, b) => b.currentStock - a.currentStock);
 
       setModelOutgoingData(sortedModelData);
 
@@ -297,7 +280,13 @@ const Dashboard = () => {
       
     } catch (error) {
       console.error('Dashboard verileri alınamadı:', error);
-      toast.error('Dashboard verileri alınamadı');
+      
+      // ✅ Daha açıklayıcı hata mesajı
+      if (error.response?.status === 404) {
+        toast.error('Bazı veriler alınamadı (API endpointi bulunamadı)');
+      } else {
+        toast.error('Dashboard verileri alınamadı');
+      }
     } finally {
       setLoading(false);
     }
@@ -361,19 +350,18 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/* ✅ Başlık ve Filtreler - EXPORT BUTONLARI BURADA */}
+      {/* Başlık ve Filtreler */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white rounded-xl p-4 sm:p-6 shadow-sm border border-gray-100">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
             📊 Hoş geldiniz, {user?.name || 'Kullanıcı'}!
           </h1>
           <p className="text-sm text-gray-600 mt-1">
-            Kanat stok durumu ve çıkış raporları
+            Kanat stok durumu ve raporları
           </p>
         </div>
         
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* ✅ EXPORT BUTONLARI */}
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={handleExportExcel}
@@ -442,7 +430,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ✅ Stats Grid */}
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {statsCards.map((stat, index) => (
           <div key={index} className="bg-white rounded-xl shadow-sm p-4 sm:p-5 border border-gray-100 hover:shadow-md transition-all">
@@ -463,12 +451,12 @@ const Dashboard = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* ✅ MODEL BAZLI ÇIKIŞ RAPORU */}
+        {/* Model Bazlı Stok Raporu */}
         <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h2 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
               <ChartBarIcon className="h-5 w-5 text-blue-500" />
-              Model Bazlı Çıkış Raporu
+              Model Bazlı Stok Durumu
             </h2>
             <div className="flex items-center gap-2 text-xs text-gray-400">
               <span>{dateRangeOptions.find(d => d.value === dateRange)?.label}</span>
@@ -491,14 +479,14 @@ const Dashboard = () => {
                       width={100}
                     />
                     <Tooltip 
-                      formatter={(value) => [`${value} adet`, 'Çıkış']}
+                      formatter={(value) => [`${value} adet`, 'Mevcut Stok']}
                       labelFormatter={(label) => `Model: ${label}`}
                     />
-                    <Bar dataKey="quantity" radius={[0, 4, 4, 0]}>
+                    <Bar dataKey="currentStock" radius={[0, 4, 4, 0]}>
                       {topModels.map((entry, index) => (
                         <Cell 
                           key={`cell-${index}`} 
-                          fill={entry.quantity > 200 ? '#10b981' : entry.quantity > 100 ? '#f59e0b' : '#ef4444'} 
+                          fill={entry.currentStock > 200 ? '#10b981' : entry.currentStock > 100 ? '#f59e0b' : '#ef4444'} 
                         />
                       ))}
                     </Bar>
@@ -511,8 +499,7 @@ const Dashboard = () => {
                   <thead className="bg-gray-50 rounded-lg">
                     <tr>
                       <th className="text-left py-2 px-2 sm:px-3 font-medium text-gray-600">Model</th>
-                      <th className="text-right py-2 px-2 sm:px-3 font-medium text-gray-600">Çıkış</th>
-                      <th className="text-right py-2 px-2 sm:px-3 font-medium text-gray-600">Kalan Stok</th>
+                      <th className="text-right py-2 px-2 sm:px-3 font-medium text-gray-600">Mevcut Stok</th>
                       <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-600">Durum</th>
                     </tr>
                   </thead>
@@ -522,13 +509,7 @@ const Dashboard = () => {
                         <td className="py-2 px-2 sm:px-3 font-medium text-gray-800 truncate max-w-[80px] sm:max-w-none">
                           {item.model}
                         </td>
-                        <td className="py-2 px-2 sm:px-3 text-right font-bold text-gray-900">
-                          {item.quantity} adet
-                        </td>
-                        <td className={`py-2 px-2 sm:px-3 text-right font-semibold ${
-                          item.currentStock < 30 ? 'text-red-600' : 
-                          item.currentStock < 50 ? 'text-orange-600' : 'text-gray-700'
-                        }`}>
+                        <td className={`py-2 px-2 sm:px-3 text-right font-bold ${item.currentStock < 30 ? 'text-red-600' : item.currentStock < 50 ? 'text-orange-600' : 'text-gray-900'}`}>
                           {item.currentStock} adet
                         </td>
                         <td className="py-2 px-2 sm:px-3 text-center">
@@ -550,18 +531,15 @@ const Dashboard = () => {
           ) : (
             <div className="text-center py-12">
               <div className="text-4xl mb-2">📭</div>
-              <p className="text-gray-500">Bu dönemde çıkış yapılmamış</p>
+              <p className="text-gray-500">Henüz stok verisi bulunmuyor</p>
               <p className="text-xs text-gray-400 mt-1">
-                Seçili tarih aralığında veri bulunamadı
-              </p>
-              <p className="text-xs text-blue-500 mt-2">
-                💡 İpucu: Stok Çıkışı yaparak veri oluşturabilirsiniz
+                Ürün ekleyerek stok verisi oluşturabilirsiniz
               </p>
             </div>
           )}
         </div>
 
-        {/* ✅ Düşük Stok Uyarıları */}
+        {/* Düşük Stok Uyarıları */}
         <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
           <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500" />
@@ -622,7 +600,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ✅ Şube Bazlı Stok Dağılımı */}
+      {/* Şube Bazlı Stok Dağılımı */}
       <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
         <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
           <BuildingOfficeIcon className="h-5 w-5 text-blue-500" />
