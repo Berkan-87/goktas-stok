@@ -1,8 +1,7 @@
-// models/Material.js
+// models/Material.js - KESİN ÇÖZÜM
 const mongoose = require('mongoose');
 
 const materialSchema = new mongoose.Schema({
-  // Ortak alanlar
   name: {
     type: String,
     required: [true, 'Malzeme adı zorunludur'],
@@ -10,7 +9,10 @@ const materialSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['mdf', 'glue', 'edgeband', 'pvc'],
+    enum: {
+      values: ['mdf', 'glue', 'edgeband', 'pvc'],
+      message: 'Geçersiz kategori'
+    },
     required: [true, 'Kategori seçimi zorunludur']
   },
   unit: {
@@ -19,50 +21,26 @@ const materialSchema = new mongoose.Schema({
     default: 'adet'
   },
   
-  // MDF'ye özel alanlar
-  thickness: {
-    type: Number,
-    default: null,
-    min: 0
-  },
-  size: {
-    type: String,
-    trim: true,
-    default: null
-  },
+  // MDF
+  thickness: { type: Number, default: null },
+  size: { type: String, trim: true, default: null },
   
-  // Tutkal'a özel alanlar
+  // Tutkal
   glueType: {
     type: String,
     enum: ['iskelet', 'laminasyon', 'kenar_bant'],
-    default: null,
-    validate: {
-      validator: function(value) {
-        if (this.category === 'glue') {
-          return value !== null && value !== undefined && value !== '';
-        }
-        return true;
-      },
-      message: 'Tutkal tipi seçimi zorunludur'
-    }
-  },
-  
-  // Kenar Bant ve PVC'ye özel alanlar
-  color: {
-    type: String,
-    default: null
-  },
-  colorName: {
-    type: String,
-    trim: true,
     default: null
   },
   
-  // Stok bilgileri
+  // Kenar Bant / PVC
+  color: { type: String, default: null },
+  colorName: { type: String, trim: true, default: null },
+  
+  // Stok
   stock: {
     type: Number,
     default: 0,
-    min: 0
+    min: [0, 'Stok miktarı negatif olamaz']
   },
   branch: {
     type: String,
@@ -72,45 +50,51 @@ const materialSchema = new mongoose.Schema({
   criticalLevel: {
     type: Number,
     default: 10,
-    min: 1
+    min: [1, 'Kritik seviye en az 1 olmalıdır']
   },
   
   isActive: {
     type: Boolean,
     default: true
   }
-}, { 
-  timestamps: true 
-});
+}, { timestamps: true });
 
 // ✅ Benzersiz indeks
 materialSchema.index({ category: 1, name: 1, branch: 1 }, { unique: true });
 
-// ✅ Pre-save middleware - Kategoriye göre gereksiz alanları temizle
+// ✅ Pre-save middleware
 materialSchema.pre('save', function(next) {
-  // MDF değilse thickness ve size'ı temizle
+  // Kategoriye göre gereksiz alanları temizle
   if (this.category !== 'mdf') {
     this.thickness = null;
     this.size = null;
   }
-  
-  // Tutkal değilse glueType'ı temizle
   if (this.category !== 'glue') {
     this.glueType = null;
   }
-  
-  // Kenar Bant veya PVC değilse renk alanlarını temizle
   if (this.category !== 'edgeband' && this.category !== 'pvc') {
     this.color = null;
     this.colorName = null;
   }
-  
-  // Tutkal ise glueType kontrol et
-  if (this.category === 'glue' && !this.glueType) {
-    return next(new Error('Tutkal tipi seçimi zorunludur'));
-  }
-  
   next();
 });
+
+// ✅ POST-save hata yakalama için statik metod
+materialSchema.statics.createWithValidation = async function(data) {
+  try {
+    // Kategoriye göre validasyon
+    if (data.category === 'glue' && !data.glueType) {
+      throw new Error('Tutkal tipi seçimi zorunludur');
+    }
+    if ((data.category === 'edgeband' || data.category === 'pvc') && !data.color) {
+      throw new Error('Renk seçimi zorunludur');
+    }
+    
+    const material = new this(data);
+    return await material.save();
+  } catch (error) {
+    throw error;
+  }
+};
 
 module.exports = mongoose.model('Material', materialSchema);
