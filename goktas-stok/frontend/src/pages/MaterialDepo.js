@@ -23,7 +23,6 @@ const MaterialDepo = () => {
     unit: 'adet',
     thickness: '',
     size: '',
-    glueType: '',
     color: '',
     colorName: '',
     stock: 0,
@@ -43,12 +42,6 @@ const MaterialDepo = () => {
     { id: 'glue', label: '🧴 Tutkallar' },
     { id: 'edgeband', label: '📐 Kenar Bantlar' },
     { id: 'pvc', label: '🔲 PVC\'ler' }
-  ];
-
-  const glueTypes = [
-    { value: 'iskelet', label: 'İskelet Tutkalı' },
-    { value: 'laminasyon', label: 'Laminasyon Tutkalı' },
-    { value: 'kenar_bant', label: 'Kenar Bant Tutkalı' }
   ];
 
   const colors = [
@@ -89,11 +82,6 @@ const MaterialDepo = () => {
       return;
     }
 
-    if (activeTab === 'glue' && !newMaterial.glueType) {
-      toast.error('Tutkal tipi seçimi zorunludur');
-      return;
-    }
-
     if ((activeTab === 'edgeband' || activeTab === 'pvc') && !newMaterial.color) {
       toast.error('Renk seçimi zorunludur');
       return;
@@ -113,8 +101,6 @@ const MaterialDepo = () => {
       if (activeTab === 'mdf') {
         payload.thickness = newMaterial.thickness || null;
         payload.size = newMaterial.size || null;
-      } else if (activeTab === 'glue') {
-        payload.glueType = newMaterial.glueType;
       } else if (activeTab === 'edgeband' || activeTab === 'pvc') {
         payload.color = newMaterial.color;
         payload.colorName = newMaterial.colorName || '';
@@ -140,7 +126,6 @@ const MaterialDepo = () => {
       unit: 'adet',
       thickness: '',
       size: '',
-      glueType: '',
       color: '',
       colorName: '',
       stock: 0,
@@ -226,20 +211,6 @@ const MaterialDepo = () => {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Tutkal Tipi *</label>
-              <select
-                value={newMaterial.glueType}
-                onChange={(e) => setNewMaterial({ ...newMaterial, glueType: e.target.value })}
-                className="input-field"
-                required
-              >
-                <option value="">Tutkal Tipi Seçin</option>
-                {glueTypes.map(t => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-            <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Birim</label>
               <select
                 value={newMaterial.unit}
@@ -314,8 +285,6 @@ const MaterialDepo = () => {
     let details = '';
     if (material.category === 'mdf') {
       details = `${material.thickness || '?'}mm - ${material.size || '?'}`;
-    } else if (material.category === 'glue') {
-      details = glueTypes.find(t => t.value === material.glueType)?.label || material.glueType;
     } else if (material.category === 'edgeband' || material.category === 'pvc') {
       const color = colors.find(c => c.id === material.color);
       details = color ? `${color.emoji} ${color.name}` : material.colorName;

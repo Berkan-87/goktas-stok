@@ -44,15 +44,11 @@ router.post('/', auth, async (req, res) => {
 
     console.log('📦 Gelen malzeme:', req.body);
 
-    const { category, glueType, color, name, branch } = req.body;
+    const { category, color, name, branch } = req.body;
 
     // Validasyonlar
     if (!name || name.trim() === '') {
       return res.status(400).json({ message: 'Malzeme adı zorunludur' });
-    }
-
-    if (category === 'glue' && !glueType) {
-      return res.status(400).json({ message: 'Tutkal tipi seçimi zorunludur' });
     }
 
     if ((category === 'edgeband' || category === 'pvc') && !color) {
@@ -78,7 +74,6 @@ router.post('/', auth, async (req, res) => {
       unit: req.body.unit || 'adet',
       thickness: req.body.thickness || null,
       size: req.body.size || null,
-      glueType: category === 'glue' ? glueType : null,
       color: (category === 'edgeband' || category === 'pvc') ? color : null,
       colorName: req.body.colorName || null,
       stock: parseInt(req.body.stock) || 0,
@@ -171,9 +166,6 @@ router.put('/:id', auth, async (req, res) => {
       if (updateData.category !== 'mdf') {
         updateData.thickness = null;
         updateData.size = null;
-      }
-      if (updateData.category !== 'glue') {
-        updateData.glueType = null;
       }
       if (updateData.category !== 'edgeband' && updateData.category !== 'pvc') {
         updateData.color = null;

@@ -9,10 +9,7 @@ const materialSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: {
-      values: ['mdf', 'glue', 'edgeband', 'pvc'],
-      message: 'Geçersiz kategori'
-    },
+    enum: ['mdf', 'glue', 'edgeband', 'pvc'],
     required: [true, 'Kategori seçimi zorunludur']
   },
   unit: {
@@ -25,22 +22,7 @@ const materialSchema = new mongoose.Schema({
   thickness: { type: Number, default: null },
   size: { type: String, trim: true, default: null },
   
-  // Tutkal
-  glueType: {
-    type: String,
-    enum: ['iskelet', 'laminasyon', 'kenar_bant'],
-    default: null,
-    validate: {
-      validator: function(value) {
-        if (this.category === 'glue') {
-          return value !== null && value !== undefined && value !== '';
-        }
-        return true;
-      },
-      message: 'Tutkal tipi seçimi zorunludur'
-    }
-  },
-  
+  // Tutkal - glueType kaldırıldı, isim ile belirlenecek
   // Kenar Bant / PVC
   color: { type: String, default: null },
   colorName: { type: String, trim: true, default: null },
@@ -49,7 +31,7 @@ const materialSchema = new mongoose.Schema({
   stock: {
     type: Number,
     default: 0,
-    min: [0, 'Stok miktarı negatif olamaz']
+    min: 0
   },
   branch: {
     type: String,
@@ -59,7 +41,7 @@ const materialSchema = new mongoose.Schema({
   criticalLevel: {
     type: Number,
     default: 10,
-    min: [1, 'Kritik seviye en az 1 olmalıdır']
+    min: 1
   },
   
   isActive: {
@@ -68,26 +50,7 @@ const materialSchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
-// ✅ Benzersiz indeks
+// Benzersiz indeks
 materialSchema.index({ category: 1, name: 1, branch: 1 }, { unique: true });
-
-// ✅ Pre-save middleware
-materialSchema.pre('save', function(next) {
-  if (this.category !== 'mdf') {
-    this.thickness = null;
-    this.size = null;
-  }
-  if (this.category !== 'glue') {
-    this.glueType = null;
-  }
-  if (this.category !== 'edgeband' && this.category !== 'pvc') {
-    this.color = null;
-    this.colorName = null;
-  }
-  if (this.category === 'glue' && !this.glueType) {
-    return next(new Error('Tutkal tipi seçimi zorunludur'));
-  }
-  next();
-});
 
 module.exports = mongoose.model('Material', materialSchema);
