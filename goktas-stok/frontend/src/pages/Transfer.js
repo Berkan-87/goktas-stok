@@ -13,7 +13,8 @@ import {
   DocumentArrowDownIcon,
   UserIcon,
   CalendarIcon,
-  CubeIcon
+  CubeIcon,
+  PlusCircleIcon
 } from '@heroicons/react/24/outline';
 
 const Transfer = () => {
@@ -30,7 +31,9 @@ const Transfer = () => {
     targetBranch: user?.branch || '',
     productId: '',
     quantity: '',
-    note: ''
+    note: '',
+    isCustom: false,
+    customName: ''
   });
 
   const [selectedStatus, setSelectedStatus] = useState('all');
@@ -42,7 +45,8 @@ const Transfer = () => {
     productName: '',
     requestedQuantity: 0,
     partialQuantity: '',
-    partialNote: ''
+    partialNote: '',
+    isCustom: false
   });
 
   const colors = [
@@ -161,7 +165,12 @@ const Transfer = () => {
       return;
     }
 
-    if (!formData.productId) {
+    if (formData.isCustom && !formData.customName) {
+      toast.error('Özel ürün adı giriniz');
+      return;
+    }
+
+    if (!formData.isCustom && !formData.productId) {
       toast.error('Ürün seçiniz');
       return;
     }
@@ -171,28 +180,38 @@ const Transfer = () => {
       return;
     }
 
-    const factoryStock = getFactoryStock();
-    if (formData.quantity > factoryStock) {
-      toast.error(`Fabrikada yeterli stok yok! Mevcut: ${factoryStock} adet`);
-      return;
+    if (!formData.isCustom) {
+      const factoryStock = getFactoryStock();
+      if (formData.quantity > factoryStock) {
+        toast.error(`Fabrikada yeterli stok yok! Mevcut: ${factoryStock} adet`);
+        return;
+      }
     }
 
     try {
-      await axios.post('/transfers', {
+      const payload = {
         sourceBranch: 'fabrika',
         targetBranch: formData.targetBranch,
-        productId: formData.productId,
         quantity: parseInt(formData.quantity),
-        note: formData.note
-      });
+        note: formData.note,
+        isCustom: formData.isCustom,
+        customName: formData.customName
+      };
 
-      toast.success('✅ Transfer talebi oluşturuldu! Fabrika onayı bekleniyor.');
+      if (!formData.isCustom) {
+        payload.productId = formData.productId;
+      }
+
+      await axios.post('/transfers', payload);
+      toast.success('✅ Transfer talebi oluşturuldu!');
 
       setFormData({
         ...formData,
         productId: '',
         quantity: '',
-        note: ''
+        note: '',
+        customName: '',
+        isCustom: false
       });
 
       fetchData();
@@ -203,56 +222,58 @@ const Transfer = () => {
     }
   };
 
-  const handleApprove = async (transferId) => {
-    if (!window.confirm('Bu transfer talebini onaylamak istediğinize emin misiniz?')) return;
-
+  // ✅ Tümünü Gönder - Onaylar + Tamamını gönderir
+  const handleSendAll = async (transferId, quantity) => {
+    if (!window.confirm(`Talebi onaylayıp TAMAMINI (${quantity} adet) göndermek istediğinize emin misiniz?`)) return;
+    
     try {
       await axios.put(`/transfers/${transferId}/approve`);
-      toast.success('✅ Transfer onaylandı ve stoklar güncellendi!');
+      toast.success(`✅ ${quantity} adet tamamen gönderildi!`);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Onay başarısız');
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
     }
   };
 
+  // ✅ Kısmi Gönder - Önce onaylar, sonra kısmi gönderir
   const handlePartialFulfill = async (e) => {
     e.preventDefault();
     
-    const { transferId, partialQuantity, partialNote, requestedQuantity } = partialModal;
+    const { transferId, partialQuantity, partialNote, requestedQuantity, isCustom } = partialModal;
     
     if (!partialQuantity || partialQuantity <= 0) {
       toast.error('Geçerli bir miktar giriniz');
       return;
     }
 
-    if (parseInt(partialQuantity) > requestedQuantity) {
-      toast.error(`Talep edilen miktar ${requestedQuantity}, bundan fazla gönderemezsiniz`);
-      return;
-    }
-
-    if (parseInt(partialQuantity) === requestedQuantity) {
-      toast.error('Tam miktar gönderilecekse "Teslim Al" butonunu kullanın');
+    if (parseInt(partialQuantity) >= requestedQuantity) {
+      toast.error(`Kısmi miktar (${partialQuantity}), talep edilen miktardan (${requestedQuantity}) küçük olmalıdır. Tamamı için "Tümünü Gönder" butonunu kullanın.`);
       return;
     }
 
     try {
+      // Önce onayla
+      await axios.put(`/transfers/${transferId}/approve`);
+      
+      // Sonra kısmi gönder
       await axios.put(`/transfers/${transferId}/partial-fulfill`, {
         partialQuantity: parseInt(partialQuantity),
         partialNote: partialNote || 'Kısmi karşılama'
       });
       
-      toast.success(`✅ ${partialQuantity} adet kısmi karşılama tamamlandı!`);
+      toast.success(`✅ ${partialQuantity} adet kısmi karşılama tamamlandı! (Kalan: ${requestedQuantity - partialQuantity} adet)`);
       setPartialModal({ 
         show: false, 
         transferId: null, 
         productName: '',
         requestedQuantity: 0, 
         partialQuantity: '', 
-        partialNote: '' 
+        partialNote: '',
+        isCustom: false
       });
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Kısmi karşılama başarısız');
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
     }
   };
 
@@ -477,10 +498,13 @@ const Transfer = () => {
                 Ürün <span className="text-red-500">*</span>
               </label>
               <select
-                value={formData.productId}
+                value={formData.isCustom ? 'custom' : formData.productId}
                 onChange={(e) => {
-                  console.log('🔄 Seçilen ürün ID:', e.target.value);
-                  setFormData({ ...formData, productId: e.target.value, quantity: '' });
+                  if (e.target.value === 'custom') {
+                    setFormData({ ...formData, isCustom: true, productId: '' });
+                  } else {
+                    setFormData({ ...formData, isCustom: false, productId: e.target.value });
+                  }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
@@ -501,6 +525,7 @@ const Transfer = () => {
                 ) : (
                   <option value="" disabled>⚠️ Hiç ürün bulunamadı</option>
                 )}
+                <option value="custom">📦 Diğer (Özel Ürün)</option>
               </select>
 
               <div className="flex items-center gap-2 mt-1">
@@ -528,6 +553,25 @@ const Transfer = () => {
               )}
             </div>
 
+            {formData.isCustom && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Özel Ürün Adı <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.customName}
+                  onChange={(e) => setFormData({ ...formData, customName: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Örn: Cam çıtası 20mm, Pervaz beyaz"
+                  required
+                />
+                <p className="text-xs text-gray-400 mt-1">
+                  💡 Özel ürünler stoktan düşmez, sadece talep olarak kaydedilir.
+                </p>
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Miktar <span className="text-red-500">*</span>
@@ -537,22 +581,30 @@ const Transfer = () => {
                 value={formData.quantity}
                 onChange={(e) => {
                   const value = parseInt(e.target.value);
-                  const factoryStock = getFactoryStock();
-                  if (value <= factoryStock || !e.target.value) {
-                    setFormData({ ...formData, quantity: e.target.value });
+                  if (!formData.isCustom) {
+                    const factoryStock = getFactoryStock();
+                    if (value <= factoryStock || !e.target.value) {
+                      setFormData({ ...formData, quantity: e.target.value });
+                    } else {
+                      toast.error(`Fabrikada maksimum ${factoryStock} adet mevcut`);
+                    }
                   } else {
-                    toast.error(`Fabrikada maksimum ${factoryStock} adet mevcut`);
+                    setFormData({ ...formData, quantity: e.target.value });
                   }
                 }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Miktar girin"
                 min="1"
-                max={getFactoryStock() || undefined}
                 required
               />
-              {formData.productId && (
+              {formData.productId && !formData.isCustom && (
                 <p className="text-xs text-gray-500 mt-1">
                   Fabrikada mevcut: <strong>{getFactoryStock()}</strong> adet
+                </p>
+              )}
+              {formData.isCustom && (
+                <p className="text-xs text-gray-400 mt-1">
+                  ℹ️ Özel ürünler stok kontrolüne tabi değildir.
                 </p>
               )}
             </div>
@@ -570,7 +622,7 @@ const Transfer = () => {
               />
             </div>
 
-            {formData.productId && formData.quantity && formData.targetBranch && (
+            {formData.productId && formData.quantity && formData.targetBranch && !formData.isCustom && (
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <p className="text-sm font-semibold text-blue-900 mb-2">Talep Özeti:</p>
                 <p className="text-sm text-blue-800">
@@ -583,14 +635,27 @@ const Transfer = () => {
               </div>
             )}
 
+            {formData.isCustom && formData.customName && formData.quantity && formData.targetBranch && (
+              <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+                <p className="text-sm font-semibold text-purple-900 mb-2">Özel Talep Özeti:</p>
+                <p className="text-sm text-purple-800">
+                  <strong>Ürün:</strong> 📦 {formData.customName}<br />
+                  <strong>Kaynak:</strong> 🏭 Fabrika (Özel ürün - stoktan düşmez)<br />
+                  <strong>Hedef:</strong> {branches.find(b => b.value === (isFabrika ? formData.targetBranch : user?.branch))?.label}<br />
+                  <strong>Miktar:</strong> {formData.quantity} adet
+                </p>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={
                 loading ||
                 !formData.targetBranch ||
-                !formData.productId ||
+                (!formData.isCustom && !formData.productId) ||
+                (formData.isCustom && !formData.customName) ||
                 !formData.quantity ||
-                parseInt(formData.quantity) > getFactoryStock()
+                (!formData.isCustom && parseInt(formData.quantity) > getFactoryStock())
               }
               className="w-full bg-blue-600 text-white px-4 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
@@ -601,7 +666,7 @@ const Transfer = () => {
         </div>
       )}
 
-      {/* Bekleyen Talepler (Fabrika) - PROFESYONEL TASARIM */}
+      {/* Bekleyen Talepler (Fabrika) */}
       {activeTab === 'pending' && isFabrika && (
         <div className="space-y-6">
           {pendingTransfers.length === 0 ? (
@@ -611,7 +676,6 @@ const Transfer = () => {
               <p className="text-sm text-gray-400 mt-1">Tüm talepler işleme alınmış görünüyor</p>
             </div>
           ) : (
-            // ✅ Şube bazlı gruplama
             Object.entries(
               pendingTransfers.reduce((acc, transfer) => {
                 const branch = transfer.targetBranch;
@@ -626,7 +690,6 @@ const Transfer = () => {
               
               return (
                 <div key={branch} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
-                  {/* Şube Başlığı */}
                   <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <span className="text-2xl">🏢</span>
@@ -644,43 +707,54 @@ const Transfer = () => {
                     </div>
                   </div>
 
-                  {/* Talep Listesi */}
                   <div className="divide-y divide-gray-100">
                     {branchTransfers.map((transfer) => {
                       const product = transfer.productId;
                       const colorInfo = product?.color ? colors.find(c => c.id === product.color) : null;
                       const isPartial = transfer.partialQuantity && transfer.partialQuantity < transfer.quantity;
+                      const isCustom = transfer.isCustom;
                       
                       return (
                         <div key={transfer._id} className="p-4 hover:bg-gray-50 transition-colors">
                           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                            {/* Ürün Bilgisi */}
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-base font-semibold text-gray-900">
-                                  {product?.name || 'Ürün bulunamadı'}
-                                </span>
-                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                  {getCategoryEmoji(product?.category)}
-                                  {product?.category === 'kanat' ? 'Kanat' : 
-                                   product?.category === 'kasa' ? 'Kasa' : 
-                                   product?.category === 'baslik' ? 'Başlık' : ''}
-                                </span>
-                                {colorInfo && (
-                                  <span 
-                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
-                                    style={{
-                                      backgroundColor: colorInfo.color,
-                                      color: colorInfo.textColor,
-                                      borderColor: product.color === 'acik_gri' ? '#9ca3af' : 'transparent'
-                                    }}
-                                  >
-                                    {colorInfo.emoji} {colorInfo.label}
-                                  </span>
+                                {isCustom ? (
+                                  <>
+                                    <span className="text-base font-semibold text-gray-900">
+                                      📦 {transfer.customName || 'Özel Ürün'}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                      Özel Ürün
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="text-base font-semibold text-gray-900">
+                                      {product?.name || 'Ürün bulunamadı'}
+                                    </span>
+                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      {getCategoryEmoji(product?.category)}
+                                      {product?.category === 'kanat' ? 'Kanat' : 
+                                       product?.category === 'kasa' ? 'Kasa' : 
+                                       product?.category === 'baslik' ? 'Başlık' : ''}
+                                    </span>
+                                    {colorInfo && (
+                                      <span 
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
+                                        style={{
+                                          backgroundColor: colorInfo.color,
+                                          color: colorInfo.textColor,
+                                          borderColor: product.color === 'acik_gri' ? '#9ca3af' : 'transparent'
+                                        }}
+                                      >
+                                        {colorInfo.emoji} {colorInfo.label}
+                                      </span>
+                                    )}
+                                  </>
                                 )}
                               </div>
                               
-                              {/* Talep Detayları */}
                               <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
                                 <span className="flex items-center gap-1">
                                   <CubeIcon className="h-4 w-4" />
@@ -706,34 +780,40 @@ const Transfer = () => {
                               )}
                             </div>
 
-                            {/* Aksiyon Butonları */}
+                            {/* ✅ Aksiyon Butonları */}
                             <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
                               {isPartial && (
                                 <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full font-medium">
                                   ⚠️ Kısmi (Önceki: {transfer.partialQuantity})
                                 </span>
                               )}
+                              
+                              {/* ✅ Tümünü Gönder Butonu */}
                               <button
-                                onClick={() => handleApprove(transfer._id)}
+                                onClick={() => handleSendAll(transfer._id, transfer.quantity)}
                                 className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 shadow-sm hover:shadow"
                               >
                                 <CheckIcon className="h-4 w-4" />
                                 <span>Tümünü Gönder</span>
                               </button>
+                              
+                              {/* ✅ Kısmi Gönder Butonu */}
                               <button
                                 onClick={() => setPartialModal({
                                   show: true,
                                   transferId: transfer._id,
-                                  productName: product?.name || 'Ürün',
+                                  productName: isCustom ? (transfer.customName || 'Özel Ürün') : (product?.name || 'Ürün'),
                                   requestedQuantity: transfer.quantity,
                                   partialQuantity: '',
-                                  partialNote: ''
+                                  partialNote: '',
+                                  isCustom: isCustom
                                 })}
                                 className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 shadow-sm hover:shadow"
                               >
                                 <DocumentArrowDownIcon className="h-4 w-4" />
                                 <span>Kısmi Gönder</span>
                               </button>
+                              
                               <button
                                 onClick={() => handleReject(transfer._id)}
                                 className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg transition-colors border border-red-200"
@@ -806,15 +886,27 @@ const Transfer = () => {
               {getFilteredTransfers().map((transfer) => {
                 const statusBadge = getStatusBadge(transfer.status);
                 const StatusIcon = statusBadge.icon;
+                const isCustom = transfer.isCustom;
 
                 return (
                   <div key={transfer._id} className="bg-white rounded-lg shadow p-4 hover:shadow-md transition-shadow">
                     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 flex-wrap">
-                          <span className="font-medium text-gray-900">
-                            {transfer.productId?.name || 'Ürün bulunamadı'}
-                          </span>
+                          {isCustom ? (
+                            <>
+                              <span className="font-medium text-gray-900">
+                                📦 {transfer.customName || 'Özel Ürün'}
+                              </span>
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                Özel
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-medium text-gray-900">
+                              {transfer.productId?.name || 'Ürün bulunamadı'}
+                            </span>
+                          )}
                           <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge.color}`}>
                             <StatusIcon className="h-3 w-3 inline mr-1" />
                             {statusBadge.label}
@@ -859,10 +951,11 @@ const Transfer = () => {
                             onClick={() => setPartialModal({
                               show: true,
                               transferId: transfer._id,
-                              productName: transfer.productId?.name || 'Ürün',
+                              productName: isCustom ? (transfer.customName || 'Özel Ürün') : (transfer.productId?.name || 'Ürün'),
                               requestedQuantity: transfer.quantity,
                               partialQuantity: '',
-                              partialNote: ''
+                              partialNote: '',
+                              isCustom: isCustom
                             })}
                             className="text-xs bg-yellow-500 text-white px-3 py-1 rounded-lg hover:bg-yellow-600 transition-colors"
                           >
@@ -940,7 +1033,7 @@ const Transfer = () => {
                   required
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  Maksimum: {partialModal.requestedQuantity - 1} adet (Tam miktar için "Teslim Al" butonunu kullanın)
+                  Maksimum: {partialModal.requestedQuantity - 1} adet (Tam miktar için "Tümünü Gönder" butonunu kullanın)
                 </p>
               </div>
 
@@ -975,7 +1068,8 @@ const Transfer = () => {
                     productName: '',
                     requestedQuantity: 0, 
                     partialQuantity: '', 
-                    partialNote: '' 
+                    partialNote: '',
+                    isCustom: false
                   })}
                   className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
                 >

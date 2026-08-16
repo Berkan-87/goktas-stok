@@ -48,10 +48,10 @@ router.get('/branch/:branch', auth, async (req, res) => {
   }
 });
 
-// 📌 Yeni transfer talebi oluştur (ŞUBE TALEBİ)
+// 📌 Yeni transfer talebi oluştur (ŞUBE TALEBİ) - Özel ürün desteği eklendi
 router.post('/', auth, async (req, res) => {
   try {
-    const { sourceBranch, targetBranch, productId, quantity, note } = req.body;
+    const { sourceBranch, targetBranch, productId, quantity, note, isCustom, customName } = req.body;
 
     // Validasyonlar
     if (sourceBranch === targetBranch) {
@@ -62,18 +62,33 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Geçerli bir miktar giriniz' });
     }
 
-    // Ürün kontrolü
-    const product = await Product.findById(productId);
-    if (!product) {
-      return res.status(404).json({ message: 'Ürün bulunamadı' });
+    // ✅ Özel ürün kontrolü
+    if (isCustom && !customName) {
+      return res.status(400).json({ message: 'Özel ürün adı zorunludur' });
     }
 
-    // Kaynak şubede stok kontrolü
-    const sourceStock = await Stock.findOne({ productId, branch: sourceBranch });
-    if (!sourceStock || sourceStock.quantity < quantity) {
-      return res.status(400).json({ 
-        message: `Yeterli stok yok. Mevcut: ${sourceStock?.quantity || 0}` 
-      });
+    // Normal ürün kontrolü
+    if (!isCustom && !productId) {
+      return res.status(400).json({ message: 'Ürün seçiniz' });
+    }
+
+    let product = null;
+    let sourceStock = null;
+
+    // ✅ Özel ürün DEĞİLSE stok kontrolü yap
+    if (!isCustom) {
+      product = await Product.findById(productId);
+      if (!product) {
+        return res.status(404).json({ message: 'Ürün bulunamadı' });
+      }
+
+      // Kaynak şubede stok kontrolü
+      sourceStock = await Stock.findOne({ productId, branch: sourceBranch });
+      if (!sourceStock || sourceStock.quantity < quantity) {
+        return res.status(400).json({ 
+          message: `Yeterli stok yok. Mevcut: ${sourceStock?.quantity || 0}` 
+        });
+      }
     }
 
     // Transfer talebi oluştur
@@ -81,15 +96,20 @@ router.post('/', auth, async (req, res) => {
       requestedBy: req.user._id,
       sourceBranch,
       targetBranch,
-      productId,
+      productId: isCustom ? null : productId,
       quantity,
       note: note || '',
-      status: 'pending'
+      status: 'pending',
+      isCustom: isCustom || false,
+      customName: customName || ''
     });
 
     await transfer.save();
     await transfer.populate('requestedBy', 'name username');
-    await transfer.populate('productId', 'name category color');
+    
+    if (!isCustom) {
+      await transfer.populate('productId', 'name category color');
+    }
 
     res.status(201).json(transfer);
   } catch (error) {
@@ -115,38 +135,41 @@ router.put('/:id/approve', auth, async (req, res) => {
       return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
     }
 
-    // Kaynak şubede stok kontrolü
-    const sourceStock = await Stock.findOne({ 
-      productId: transfer.productId, 
-      branch: transfer.sourceBranch 
-    });
-    
-    if (!sourceStock || sourceStock.quantity < transfer.quantity) {
-      return res.status(400).json({ 
-        message: `Yeterli stok yok! Mevcut: ${sourceStock?.quantity || 0}` 
+    // ✅ Özel ürün ise stok kontrolü YAPMA, direkt onayla
+    if (!transfer.isCustom) {
+      // Kaynak şubede stok kontrolü
+      const sourceStock = await Stock.findOne({ 
+        productId: transfer.productId, 
+        branch: transfer.sourceBranch 
       });
-    }
+      
+      if (!sourceStock || sourceStock.quantity < transfer.quantity) {
+        return res.status(400).json({ 
+          message: `Yeterli stok yok! Mevcut: ${sourceStock?.quantity || 0}` 
+        });
+      }
 
-    // Stok işlemleri - Kaynak şubeden düş
-    sourceStock.quantity -= transfer.quantity;
-    await sourceStock.save();
+      // Stok işlemleri - Kaynak şubeden düş
+      sourceStock.quantity -= transfer.quantity;
+      await sourceStock.save();
 
-    // Hedef şubeye ekle (yoksa oluştur)
-    let targetStock = await Stock.findOne({ 
-      productId: transfer.productId, 
-      branch: transfer.targetBranch 
-    });
-    
-    if (!targetStock) {
-      targetStock = new Stock({
-        productId: transfer.productId,
-        branch: transfer.targetBranch,
-        quantity: 0,
-        criticalLevel: 10
+      // Hedef şubeye ekle (yoksa oluştur)
+      let targetStock = await Stock.findOne({ 
+        productId: transfer.productId, 
+        branch: transfer.targetBranch 
       });
+      
+      if (!targetStock) {
+        targetStock = new Stock({
+          productId: transfer.productId,
+          branch: transfer.targetBranch,
+          quantity: 0,
+          criticalLevel: 10
+        });
+      }
+      targetStock.quantity += transfer.quantity;
+      await targetStock.save();
     }
-    targetStock.quantity += transfer.quantity;
-    await targetStock.save();
 
     // Transfer durumunu güncelle
     transfer.status = 'approved';
@@ -156,10 +179,13 @@ router.put('/:id/approve', auth, async (req, res) => {
 
     await transfer.populate('requestedBy', 'name username');
     await transfer.populate('approvedBy', 'name username');
-    await transfer.populate('productId', 'name category color');
+    
+    if (!transfer.isCustom) {
+      await transfer.populate('productId', 'name category color');
+    }
 
     res.json({ 
-      message: 'Transfer onaylandı ve stoklar güncellendi', 
+      message: transfer.isCustom ? 'Özel ürün talebi onaylandı' : 'Transfer onaylandı ve stoklar güncellendi', 
       transfer 
     });
   } catch (error) {
@@ -168,7 +194,7 @@ router.put('/:id/approve', auth, async (req, res) => {
   }
 });
 
-// 📌 ✅ YENİ: Kısmi karşılama (Fabrika kısmi miktar gönderir)
+// 📌 Kısmi karşılama (Fabrika kısmi miktar gönderir)
 router.put('/:id/partial-fulfill', auth, async (req, res) => {
   try {
     const { partialQuantity, partialNote } = req.body;
@@ -176,6 +202,11 @@ router.put('/:id/partial-fulfill', auth, async (req, res) => {
     
     if (!transfer) {
       return res.status(404).json({ message: 'Transfer bulunamadı' });
+    }
+
+    // ✅ Özel ürünler kısmi karşılanamaz
+    if (transfer.isCustom) {
+      return res.status(400).json({ message: 'Özel ürünler kısmi karşılanamaz' });
     }
 
     // Sadece onaylanmış transferler kısmi karşılanabilir
@@ -220,12 +251,10 @@ router.put('/:id/partial-fulfill', auth, async (req, res) => {
       });
     }
 
-    // ✅ Kısmi stok işlemi
-    // 1. Kaynak şubeden düş
+    // Kısmi stok işlemi
     sourceStock.quantity -= partialQuantity;
     await sourceStock.save();
 
-    // 2. Hedef şubeye ekle
     let targetStock = await Stock.findOne({ 
       productId: transfer.productId, 
       branch: transfer.targetBranch 
@@ -293,7 +322,10 @@ router.put('/:id/reject', auth, async (req, res) => {
 
     await transfer.populate('requestedBy', 'name username');
     await transfer.populate('rejectedBy', 'name username');
-    await transfer.populate('productId', 'name category color');
+    
+    if (!transfer.isCustom) {
+      await transfer.populate('productId', 'name category color');
+    }
 
     res.json({ message: 'Transfer reddedildi', transfer });
   } catch (error) {
@@ -330,7 +362,10 @@ router.put('/:id/complete', auth, async (req, res) => {
 
     await transfer.populate('requestedBy', 'name username');
     await transfer.populate('completedBy', 'name username');
-    await transfer.populate('productId', 'name category color');
+    
+    if (!transfer.isCustom) {
+      await transfer.populate('productId', 'name category color');
+    }
 
     res.json({ message: 'Transfer tamamlandı', transfer });
   } catch (error) {
@@ -361,7 +396,10 @@ router.put('/:id/cancel', auth, async (req, res) => {
     await transfer.save();
 
     await transfer.populate('requestedBy', 'name username');
-    await transfer.populate('productId', 'name category color');
+    
+    if (!transfer.isCustom) {
+      await transfer.populate('productId', 'name category color');
+    }
 
     res.json({ message: 'Transfer iptal edildi', transfer });
   } catch (error) {
@@ -387,7 +425,7 @@ router.get('/pending', auth, async (req, res) => {
   }
 });
 
-// 📌 ✅ YENİ: Kısmi karşılanmış transferleri getir
+// 📌 Kısmi karşılanmış transferleri getir
 router.get('/partial-fulfilled', auth, async (req, res) => {
   try {
     const transfers = await Transfer.find({ 
@@ -404,7 +442,7 @@ router.get('/partial-fulfilled', auth, async (req, res) => {
   }
 });
 
-// 📌 ✅ YENİ: Onaylanmış ama henüz kısmi karşılanmamış transferler
+// 📌 Onaylanmış ama henüz kısmi karşılanmamış transferler
 router.get('/awaiting-fulfillment', auth, async (req, res) => {
   try {
     const transfers = await Transfer.find({ 

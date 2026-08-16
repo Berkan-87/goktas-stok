@@ -20,11 +20,14 @@ const transferSchema = new mongoose.Schema({
     enum: ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka'],
     required: true
   },
+  
+  // ✅ productId artık required değil (özel ürünler için null olabilir)
   productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
-    required: true
+    default: null
   },
+  
   quantity: {
     type: Number,
     required: true,
@@ -36,32 +39,39 @@ const transferSchema = new mongoose.Schema({
     default: ''
   },
   
-  // ✅ Transfer durumu: pending, approved, partially_fulfilled, completed, rejected, cancelled
+  // ✅ ÖZEL ÜRÜN ALANLARI (YENİ)
+  isCustom: {
+    type: Boolean,
+    default: false
+  },
+  customName: {
+    type: String,
+    trim: true,
+    default: ''
+  },
+  
+  // ✅ Transfer durumu
   status: {
     type: String,
     enum: ['pending', 'approved', 'partially_fulfilled', 'completed', 'rejected', 'cancelled'],
     default: 'pending'
   },
   
-  // ✅ KISMI KARŞILAMA ALANLARI (YENİ)
-  // Gönderilen gerçek miktar (talep edilenden az)
+  // Kısmi karşılama alanları
   partialQuantity: {
     type: Number,
     default: null,
     min: 0
   },
-  // Kısmi gönderim notu
   partialNote: {
     type: String,
     trim: true,
     default: ''
   },
-  // Kısmi karşılama yapıldı mı?
   partialFulfilled: {
     type: Boolean,
     default: false
   },
-  // Kısmi karşılama yapan kişi
   partialFulfilledBy: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -112,8 +122,7 @@ transferSchema.index({ sourceBranch: 1, targetBranch: 1 });
 transferSchema.index({ productId: 1 });
 transferSchema.index({ status: 1 });
 transferSchema.index({ createdAt: -1 });
-
-// ✅ Kısmi karşılama için ek indeks
+transferSchema.index({ isCustom: 1 }); // ✅ Özel ürün sorguları için
 transferSchema.index({ partialFulfilled: 1, status: 1 });
 
 // ✅ Virtual field - Kalan miktar
@@ -139,7 +148,6 @@ transferSchema.virtual('fulfillmentPercentage').get(function() {
 transferSchema.statics.getPendingPartialFulfillments = async function() {
   return this.find({ 
     status: 'approved',
-    // partialQuantity null veya 0 olanlar henüz kısmi karşılanmamış
     $or: [
       { partialQuantity: { $eq: null } },
       { partialQuantity: 0 }
@@ -159,13 +167,10 @@ transferSchema.statics.getPartialFulfilled = async function() {
 transferSchema.pre('save', function(next) {
   // Eğer partialQuantity varsa ve status henüz partially_fulfilled değilse
   if (this.partialQuantity && this.partialQuantity > 0 && this.status === 'approved') {
-    // Kısmi karşılama miktarı, talep edilen miktardan küçük olmalı
     if (this.partialQuantity < this.quantity) {
       this.status = 'partially_fulfilled';
       this.partialFulfilled = true;
-    }
-    // Eğer partialQuantity, quantity'ye eşitse completed olur
-    else if (this.partialQuantity === this.quantity) {
+    } else if (this.partialQuantity === this.quantity) {
       this.status = 'completed';
     }
   }
