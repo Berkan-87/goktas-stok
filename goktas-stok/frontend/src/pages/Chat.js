@@ -33,7 +33,6 @@ const Chat = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const messagesContainerRef = useRef(null);
   const isFirstLoad = useRef(true);
-  const notificationSound = useRef(null);
 
   // ✅ Ses çalma
   const playSound = () => {
@@ -300,6 +299,7 @@ const Chat = () => {
       })));
       
       updateUnreadCounts();
+      toast.success('Tüm mesajlar okundu olarak işaretlendi');
     } catch (error) {
       console.error('Okundu işaretleme hatası:', error);
     }
@@ -318,40 +318,55 @@ const Chat = () => {
       }));
       
       updateUnreadCounts();
+      
     } catch (error) {
       console.error('Mesaj okuma hatası:', error);
     }
   };
 
-  // ✅ Okunmamış sayılarını güncelle
+  // ✅ Okunmamış sayılarını güncelle - DÜZELTİLDİ
   const updateUnreadCounts = () => {
     if (!activeChats || activeChats.length === 0) return;
     
     const counts = {};
+    let totalUnread = 0;
+    
     activeChats.forEach(chat => {
       if (!chat) return;
       
+      let count = 0;
       if (chat.type === 'general') {
-        counts[chat.id] = messages.filter(m => 
+        count = messages.filter(m => 
           !m.readBy?.includes(user._id) && 
           m.sender?._id !== user._id &&
           !m.receiver && !m.group
         ).length;
       } else if (chat.type === 'private') {
-        counts[chat.id] = messages.filter(m => 
+        count = messages.filter(m => 
           !m.readBy?.includes(user._id) && 
           m.sender?._id !== user._id &&
           (m.sender?._id === chat.id || m.receiver === chat.id)
         ).length;
       } else if (chat.type === 'group') {
-        counts[chat.id] = messages.filter(m => 
+        count = messages.filter(m => 
           !m.readBy?.includes(user._id) && 
           m.sender?._id !== user._id &&
           m.group === chat.id
         ).length;
       }
+      
+      counts[chat.id] = count;
+      totalUnread += count;
     });
+    
     setUnreadCounts(counts);
+    
+    // ✅ LocalStorage'a yaz ve event gönder
+    const currentTotal = parseInt(localStorage.getItem('chatUnreadCount')) || 0;
+    if (currentTotal !== totalUnread) {
+      localStorage.setItem('chatUnreadCount', String(totalUnread));
+      window.dispatchEvent(new Event('storage'));
+    }
   };
 
   // ✅ Mesaj gönder
@@ -457,7 +472,7 @@ const Chat = () => {
     return () => clearInterval(interval);
   }, [chatType, selectedUser, selectedGroup]);
 
-  // ✅ Arama filtresi - Güvenli
+  // ✅ Arama filtresi
   const filteredChats = (activeChats && activeChats.length > 0) 
     ? activeChats.filter(chat => 
         chat && chat.name && chat.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -471,7 +486,7 @@ const Chat = () => {
     }
   };
 
-  // ✅ Sohbet listesini sıralı göster - Güvenli
+  // ✅ Sohbet listesini sıralı göster
   const sortedChats = (filteredChats && filteredChats.length > 0) 
     ? [...filteredChats].sort((a, b) => {
         if (!a || !b) return 0;
@@ -570,7 +585,7 @@ const Chat = () => {
               </div>
             </div>
 
-            {/* ✅ Sohbet listesi - En son mesaja göre sıralı */}
+            {/* Sohbet listesi */}
             {sortedChats.length > 0 ? (
               sortedChats.map((chat) => {
                 if (!chat) return null;
@@ -671,7 +686,6 @@ const Chat = () => {
                     } else if (chatType === 'group' && selectedGroup) {
                       markAllAsRead('group', selectedGroup);
                     }
-                    toast.success('Tüm mesajlar okundu olarak işaretlendi');
                   }}
                   className="text-sm text-blue-600 hover:text-blue-800 font-medium whitespace-nowrap"
                 >
@@ -681,7 +695,7 @@ const Chat = () => {
             </div>
           </div>
 
-          {/* ✅ Mesaj Listesi - En yeni en üstte */}
+          {/* Mesaj Listesi */}
           <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={messagesContainerRef}>
             {messages.length === 0 ? (
               <div className="text-center py-12">

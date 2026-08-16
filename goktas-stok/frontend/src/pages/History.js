@@ -1,218 +1,280 @@
+// frontend/src/pages/History.js
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
-import { format } from 'date-fns';
-import { tr } from 'date-fns/locale';
 import toast from 'react-hot-toast';
 import axios from '../utils/axios';
-import { DocumentArrowDownIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import {
+  ClockIcon,
+  ArrowPathIcon,
+  ArrowUpIcon,
+  ArrowDownIcon,
+  ArrowRightIcon,
+  DocumentArrowDownIcon,
+  TableCellsIcon
+} from '@heroicons/react/24/outline';
+import { exportToExcel, exportToPDF } from '../utils/exportUtils';
 
 const History = () => {
   const { user } = useSelector((state) => state.auth);
-  const [transactions, setTransactions] = useState([]);
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState({
-    branch: '',
-    type: '',
-    startDate: '',
-    endDate: ''
-  });
+  const [filter, setFilter] = useState('all'); // all, in, out, transfer
+  const [selectedBranch, setSelectedBranch] = useState('all');
+  const [dateRange, setDateRange] = useState('7days');
 
   const branches = [
-    { value: '', label: 'Tüm Şubeler' },
-    { value: 'fabrika', label: 'Fabrika' },
-    { value: 'karabaglar', label: 'Karabağlar' },
-    { value: 'manisa', label: 'Manisa' },
-    { value: 'edremit', label: 'Edremit' },
-    { value: 'karsiyaka', label: 'Karşıyaka' }
+    { value: 'all', label: 'Tüm Şubeler' },
+    { value: 'fabrika', label: '🏭 Fabrika' },
+    { value: 'karabaglar', label: '🏘️ Karabağlar' },
+    { value: 'manisa', label: '🏙️ Manisa' },
+    { value: 'edremit', label: '🌊 Edremit' },
+    { value: 'karsiyaka', label: '🏖️ Karşıyaka' }
   ];
 
-  const types = [
-    { value: '', label: 'Tüm İşlemler' },
-    { value: 'in', label: 'Stok Girişi' },
-    { value: 'out', label: 'Stok Çıkışı' },
-    { value: 'transfer', label: 'Transfer' }
+  const dateRangeOptions = [
+    { value: 'today', label: 'Bugün' },
+    { value: '7days', label: '7 Gün' },
+    { value: '30days', label: '30 Gün' },
+    { value: '90days', label: '3 Ay' },
+    { value: 'all', label: 'Tümü' }
   ];
 
   useEffect(() => {
     fetchHistory();
-  }, [filters]);
+  }, [filter, selectedBranch, dateRange]);
 
   const fetchHistory = async () => {
-    setLoading(true);
     try {
-      const params = {};
-      if (filters.branch) params.branch = filters.branch;
-      if (filters.type) params.type = filters.type;
-      if (filters.startDate) params.startDate = filters.startDate;
-      if (filters.endDate) params.endDate = filters.endDate;
-
-      const response = await axios.get('/history', { params });
-      setTransactions(response.data);
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (filter !== 'all') params.append('type', filter);
+      if (selectedBranch !== 'all') params.append('branch', selectedBranch);
+      if (dateRange !== 'all') params.append('dateRange', dateRange);
+      
+      const response = await axios.get(`/history?${params.toString()}`);
+      setHistory(response.data);
     } catch (error) {
+      console.error('❌ Geçmiş verileri alınamadı:', error);
       toast.error('Geçmiş verileri alınamadı');
     } finally {
       setLoading(false);
     }
   };
 
-  const getTypeLabel = (type) => {
-    const labels = {
-      in: { text: 'Stok Girişi', color: 'text-green-600 bg-green-100' },
-      out: { text: 'Stok Çıkışı', color: 'text-red-600 bg-red-100' },
-      transfer: { text: 'Transfer', color: 'text-blue-600 bg-blue-100' }
-    };
-    return labels[type] || { text: type, color: 'text-gray-600 bg-gray-100' };
-  };
+  // ✅ Excel Export
+  const handleExportExcel = () => {
+    if (history.length === 0) {
+      toast.error('Export yapılacak veri bulunamadı!');
+      return;
+    }
 
-  const getBranchInfo = (transaction) => {
-    if (transaction.type === 'transfer') {
-      return `${transaction.fromBranch} → ${transaction.toBranch}`;
-    } else if (transaction.type === 'in') {
-      return `Giriş: ${transaction.toBranch}`;
+    const exportData = history.map(item => ({
+      'Tarih': new Date(item.createdAt).toLocaleString('tr-TR'),
+      'İşlem': item.type === 'in' ? 'Giriş' : item.type === 'out' ? 'Çıkış' : 'Transfer',
+      'Ürün': item.productId?.name || '-',
+      'Şube': branches.find(b => b.value === item.branch)?.label || item.branch,
+      'Miktar': item.quantity,
+      'Not': item.note || '-'
+    }));
+
+    const success = exportToExcel(exportData, `Gecmis_${new Date().toISOString().split('T')[0]}`);
+    if (success) {
+      toast.success('📊 Geçmiş Excel olarak indirildi!');
     } else {
-      return `Çıkış: ${transaction.fromBranch}`;
+      toast.error('Excel export başarısız!');
     }
   };
 
-  const exportToCSV = () => {
-    const headers = ['Tarih', 'İşlem Tipi', 'Ürün', 'Miktar', 'Şube Bilgisi', 'Not', 'Kullanıcı'];
-    const data = transactions.map(t => [
-      format(new Date(t.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr }),
-      getTypeLabel(t.type).text,
-      t.productId?.name || '-', // ✅ SADECE ÜRÜN ADI
-      t.quantity,
-      getBranchInfo(t),
-      t.note || '-',
-      t.user?.name || '-'
-    ]);
+  // ✅ PDF Export
+  const handleExportPDF = () => {
+    if (history.length === 0) {
+      toast.error('Export yapılacak veri bulunamadı!');
+      return;
+    }
 
-    const csvContent = [headers, ...data].map(row => row.join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `stok_gecmisi_${format(new Date(), 'yyyyMMdd')}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const exportData = history.map(item => ({
+      'Tarih': new Date(item.createdAt).toLocaleString('tr-TR'),
+      'İşlem': item.type === 'in' ? 'Giriş' : item.type === 'out' ? 'Çıkış' : 'Transfer',
+      'Ürün': item.productId?.name || '-',
+      'Şube': branches.find(b => b.value === item.branch)?.label || item.branch,
+      'Miktar': item.quantity,
+      'Not': item.note || '-'
+    }));
+
+    const columns = [
+      { key: 'Tarih', label: 'Tarih' },
+      { key: 'İşlem', label: 'İşlem' },
+      { key: 'Ürün', label: 'Ürün' },
+      { key: 'Şube', label: 'Şube' },
+      { key: 'Miktar', label: 'Miktar' },
+      { key: 'Not', label: 'Not' }
+    ];
+
+    const success = exportToPDF(exportData, `Gecmis_${new Date().toISOString().split('T')[0]}`, 'Geçmiş Raporu', columns);
+    if (success) {
+      toast.success('📄 Geçmiş PDF olarak indirildi!');
+    } else {
+      toast.error('PDF export başarısız!');
+    }
   };
+
+  const getTypeIcon = (type) => {
+    if (type === 'in') return <ArrowDownIcon className="h-4 w-4 text-green-500" />;
+    if (type === 'out') return <ArrowUpIcon className="h-4 w-4 text-red-500" />;
+    return <ArrowRightIcon className="h-4 w-4 text-yellow-500" />;
+  };
+
+  const getTypeLabel = (type) => {
+    if (type === 'in') return '📥 Giriş';
+    if (type === 'out') return '📤 Çıkış';
+    return '🔄 Transfer';
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-500">Geçmiş yükleniyor...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      {/* Başlık */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">İşlem Geçmişi</h1>
-          <p className="text-gray-600 mt-1">Tüm stok hareketlerini görüntüleyin</p>
+          <h1 className="text-2xl font-bold text-gray-900">🕐 Geçmiş</h1>
+          <p className="text-gray-600 mt-1">Tüm stok hareketleri</p>
         </div>
-        {transactions.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={exportToCSV}
-            className="btn-secondary flex items-center gap-2"
+            onClick={handleExportExcel}
+            className="btn-secondary flex items-center gap-2 text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"
           >
-            <DocumentArrowDownIcon className="h-5 w-5" />
-            Excel'e Aktar
+            <TableCellsIcon className="h-4 w-4 text-green-600" />
+            Excel
           </button>
-        )}
-      </div>
-
-      {/* Filters */}
-      <div className="card">
-        <div className="flex items-center gap-2 mb-4">
-          <FunnelIcon className="h-5 w-5 text-gray-500" />
-          <h2 className="font-semibold text-gray-900">Filtreler</h2>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <select
-            value={filters.branch}
-            onChange={(e) => setFilters({ ...filters, branch: e.target.value })}
-            className="input-field"
+          <button
+            onClick={handleExportPDF}
+            className="btn-secondary flex items-center gap-2 text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"
           >
-            {branches.map(branch => (
-              <option key={branch.value} value={branch.value}>{branch.label}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.type}
-            onChange={(e) => setFilters({ ...filters, type: e.target.value })}
-            className="input-field"
+            <DocumentArrowDownIcon className="h-4 w-4 text-red-600" />
+            PDF
+          </button>
+          <button
+            onClick={fetchHistory}
+            className="btn-secondary flex items-center gap-2 text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"
           >
-            {types.map(type => (
-              <option key={type.value} value={type.value}>{type.label}</option>
-            ))}
-          </select>
-
-          <input
-            type="date"
-            value={filters.startDate}
-            onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
-            className="input-field"
-            placeholder="Başlangıç Tarihi"
-          />
-
-          <input
-            type="date"
-            value={filters.endDate}
-            onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
-            className="input-field"
-            placeholder="Bitiş Tarihi"
-          />
+            <ArrowPathIcon className="h-4 w-4" />
+            Yenile
+          </button>
         </div>
       </div>
 
-      {/* Transactions Table */}
-      <div className="card overflow-x-auto">
-        {loading ? (
-          <div className="text-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="mt-4 text-gray-500">Yükleniyor...</p>
-          </div>
-        ) : transactions.length === 0 ? (
-          <div className="text-center py-12">
-            <p className="text-gray-500">Henüz işlem kaydı bulunmuyor</p>
-          </div>
-        ) : (
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-gray-200">
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Tarih</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">İşlem Tipi</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Ürün</th>
-                <th className="text-right py-3 px-4 font-semibold text-gray-700">Miktar</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Şube Bilgisi</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Kullanıcı</th>
-                <th className="text-left py-3 px-4 font-semibold text-gray-700">Not</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((transaction) => {
-                const typeInfo = getTypeLabel(transaction.type);
-                return (
-                  <tr key={transaction._id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4 text-sm">
-                      {format(new Date(transaction.createdAt), 'dd.MM.yyyy HH:mm', { locale: tr })}
+      {/* Filtreler */}
+      <div className="bg-white rounded-xl shadow-sm p-4 border border-gray-100 flex flex-wrap items-center gap-4">
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">İşlem:</label>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            className="input-field text-sm py-1 w-32"
+          >
+            <option value="all">Tümü</option>
+            <option value="in">📥 Giriş</option>
+            <option value="out">📤 Çıkış</option>
+            <option value="transfer">🔄 Transfer</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">Şube:</label>
+          <select
+            value={selectedBranch}
+            onChange={(e) => setSelectedBranch(e.target.value)}
+            className="input-field text-sm py-1 w-40"
+          >
+            {branches.map(b => (
+              <option key={b.value} value={b.value}>{b.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-gray-700">Tarih:</label>
+          <select
+            value={dateRange}
+            onChange={(e) => setDateRange(e.target.value)}
+            className="input-field text-sm py-1 w-32"
+          >
+            {dateRangeOptions.map(opt => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="text-sm text-gray-400 ml-auto">
+          Toplam: {history.length} kayıt
+        </div>
+      </div>
+
+      {/* Geçmiş Listesi */}
+      {history.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-xl shadow">
+          <div className="text-4xl mb-2">📭</div>
+          <p className="text-lg text-gray-500">Henüz geçmiş kaydı yok</p>
+          <p className="text-sm text-gray-400 mt-1">Stok işlemleri yaptıkça burada görünecek</p>
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tarih</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlem</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ürün</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Şube</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Miktar</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Not</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {history.map((item) => (
+                  <tr key={item._id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {new Date(item.createdAt).toLocaleString('tr-TR')}
                     </td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium ${typeInfo.color}`}>
-                        {typeInfo.text}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="flex items-center gap-1">
+                        {getTypeIcon(item.type)}
+                        {getTypeLabel(item.type)}
                       </span>
                     </td>
-                    <td className="py-3 px-4">
-                      {/* ✅ SADECE ÜRÜN ADI - KOD YOK */}
-                      <p className="font-medium text-gray-900">{transaction.productId?.name || '-'}</p>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {item.productId?.name || '-'}
                     </td>
-                    <td className="py-3 px-4 text-right font-semibold">{transaction.quantity} adet</td>
-                    <td className="py-3 px-4 text-sm">{getBranchInfo(transaction)}</td>
-                    <td className="py-3 px-4 text-sm">{transaction.user?.name || '-'}</td>
-                    <td className="py-3 px-4 text-sm text-gray-500">{transaction.note || '-'}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {branches.find(b => b.value === item.branch)?.label || item.branch}
+                    </td>
+                    <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${
+                      item.type === 'in' ? 'text-green-600' : item.type === 'out' ? 'text-red-600' : 'text-yellow-600'
+                    }`}>
+                      {item.type === 'in' ? '+' : item.type === 'out' ? '-' : ''}{item.quantity}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                      {item.note || '-'}
+                    </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        )}
-      </div>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,8 +1,9 @@
+// frontend/src/components/MainLayout.js
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
-import axios from '../../utils/axios'; // ✅ DÜZELTİLDİ
+import axios from '../../utils/axios';
 import {
   HomeIcon,
   CubeIcon,
@@ -35,7 +36,9 @@ const MainLayout = () => {
       const count = response.data?.total || 0;
       setUnreadCount(count);
       
-      // ✅ Browser sekmesine de yaz
+      // ✅ LocalStorage'ı da güncelle
+      localStorage.setItem('chatUnreadCount', String(count));
+      
       if (count > 0) {
         document.title = `(${count}) GÖKTAŞ KAPI`;
       } else {
@@ -53,11 +56,49 @@ const MainLayout = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // ✅ Storage event dinleyicisi - sayfalar arası senkronizasyon
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === 'chatUnreadCount') {
+        const newCount = parseInt(e.newValue) || 0;
+        setUnreadCount(newCount);
+        
+        // Browser sekmesini güncelle
+        if (newCount > 0) {
+          document.title = `(${newCount}) GÖKTAŞ KAPI`;
+        } else {
+          document.title = 'GÖKTAŞ KAPI';
+        }
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // ✅ Sayfa görünür olduğunda kontrol et
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        fetchUnreadCount();
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   // ✅ Sohbet sayfasına gidince sayacı sıfırla
   useEffect(() => {
     if (location.pathname === '/sohbet') {
       setUnreadCount(0);
       document.title = 'GÖKTAŞ KAPI';
+      localStorage.setItem('chatUnreadCount', '0');
     }
   }, [location.pathname]);
 
@@ -145,6 +186,7 @@ const MainLayout = () => {
                 }`} />
                 <span className="font-medium flex-1">{item.name}</span>
                 
+                {/* Badge */}
                 {hasBadge && (
                   <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center animate-pulse">
                     {item.badge > 99 ? '99+' : item.badge}
@@ -166,6 +208,7 @@ const MainLayout = () => {
         </div>
       </aside>
 
+      {/* Ana İçerik */}
       <main className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
         <div className="h-16 lg:h-0 shrink-0"></div>
         <div className="flex-1 overflow-auto p-4 lg:p-6 w-full h-full">
@@ -173,6 +216,7 @@ const MainLayout = () => {
         </div>
       </main>
 
+      {/* Mobilde kapatma katmanı */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
