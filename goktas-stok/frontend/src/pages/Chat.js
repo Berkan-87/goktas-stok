@@ -31,8 +31,9 @@ const Chat = () => {
   const [unreadCounts, setUnreadCounts] = useState({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const isFirstLoad = useRef(true);
+  const lastMessageIdRef = useRef(null);
 
   // ✅ Ses çalma
   const playSound = () => {
@@ -58,6 +59,7 @@ const Chat = () => {
   const showNotification = (message) => {
     if (!notificationEnabled) return;
     
+    // ✅ Tarayıcı bildirimi
     if ('Notification' in window && Notification.permission === 'granted') {
       new Notification('💬 Yeni Mesaj', {
         body: `${message.sender?.name || 'Kullanıcı'}: ${message.content}`,
@@ -67,6 +69,7 @@ const Chat = () => {
       });
     }
 
+    // ✅ Toast bildirimi (her zaman göster)
     toast.custom((t) => (
       <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}>
         <div className="flex-1 w-0 p-4">
@@ -89,7 +92,7 @@ const Chat = () => {
           </button>
         </div>
       </div>
-    ), { duration: 5000, position: 'top-right' });
+    ), { duration: 8000, position: 'top-right' });
   };
 
   // ✅ Bildirim izni iste
@@ -135,6 +138,7 @@ const Chat = () => {
       });
       
       setActiveChats(chats);
+      updateUnreadCounts();
     } catch (error) {
       console.error('❌ Veriler alınamadı:', error);
     }
@@ -157,9 +161,13 @@ const Chat = () => {
       const response = await axios.get('/messages/general');
       const newMessages = response.data;
       
-      if (!isFirstLoad.current && messages.length > 0 && newMessages.length > messages.length) {
-        const newMsg = newMessages[0];
-        if (newMsg.sender?._id !== user._id) {
+      // ✅ Yeni mesaj kontrolü
+      if (!isFirstLoad.current && messages.length > 0) {
+        // Yeni mesaj var mı kontrol et
+        const oldIds = new Set(messages.map(m => m._id));
+        const newMsg = newMessages.find(m => !oldIds.has(m._id));
+        if (newMsg && newMsg.sender?._id !== user._id) {
+          console.log('🔔 Yeni mesaj geldi:', newMsg);
           showNotification(newMsg);
           playSound();
         }
@@ -169,21 +177,25 @@ const Chat = () => {
       isFirstLoad.current = false;
       updateUnreadCounts();
     } catch (error) {
+      console.error('❌ Mesajlar alınamadı:', error);
       toast.error('Mesajlar alınamadı');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Özel mesajları getir (SADECE GÖNDEREN VE ALICI)
+  // ✅ Özel mesajları getir
   const fetchPrivateMessages = async (userId) => {
     try {
       const response = await axios.get(`/messages/private/${userId}`);
       const newMessages = response.data;
       
-      if (!isFirstLoad.current && messages.length > 0 && newMessages.length > messages.length) {
-        const newMsg = newMessages[0];
-        if (newMsg.sender?._id !== user._id) {
+      // ✅ Yeni mesaj kontrolü
+      if (!isFirstLoad.current && messages.length > 0) {
+        const oldIds = new Set(messages.map(m => m._id));
+        const newMsg = newMessages.find(m => !oldIds.has(m._id));
+        if (newMsg && newMsg.sender?._id !== user._id) {
+          console.log('🔔 Yeni özel mesaj geldi:', newMsg);
           showNotification(newMsg);
           playSound();
         }
@@ -192,10 +204,11 @@ const Chat = () => {
       setMessages(newMessages);
       isFirstLoad.current = false;
       
-      // Mesajları okundu işaretle
+      // ✅ Mesajları okundu işaretle
       await markAllAsRead('private', userId);
       updateUnreadCounts();
     } catch (error) {
+      console.error('❌ Özel mesajlar alınamadı:', error);
       toast.error('Mesajlar alınamadı');
     } finally {
       setLoading(false);
@@ -208,9 +221,11 @@ const Chat = () => {
       const response = await axios.get(`/messages/group/${groupId}`);
       const newMessages = response.data;
       
-      if (!isFirstLoad.current && messages.length > 0 && newMessages.length > messages.length) {
-        const newMsg = newMessages[0];
-        if (newMsg.sender?._id !== user._id) {
+      if (!isFirstLoad.current && messages.length > 0) {
+        const oldIds = new Set(messages.map(m => m._id));
+        const newMsg = newMessages.find(m => !oldIds.has(m._id));
+        if (newMsg && newMsg.sender?._id !== user._id) {
+          console.log('🔔 Yeni grup mesajı geldi:', newMsg);
           showNotification(newMsg);
           playSound();
         }
@@ -221,6 +236,7 @@ const Chat = () => {
       await markAllAsRead('group', groupId);
       updateUnreadCounts();
     } catch (error) {
+      console.error('❌ Grup mesajları alınamadı:', error);
       toast.error('Mesajlar alınamadı');
     } finally {
       setLoading(false);
@@ -242,6 +258,7 @@ const Chat = () => {
       
       await axios.put('/messages/mark-all-read', payload);
       
+      // ✅ UI'da güncelle
       setMessages(prev => prev.map(m => ({
         ...m,
         readBy: [...(m.readBy || []), user._id]
@@ -319,7 +336,7 @@ const Chat = () => {
       const newMsg = response.data;
       newMsg.readBy = [user._id];
       
-      setMessages(prev => [newMsg, ...prev]); // ✅ En yeni en üste
+      setMessages(prev => [newMsg, ...prev]);
       setNewMessage('');
       
     } catch (error) {
@@ -364,7 +381,7 @@ const Chat = () => {
     updateUnreadCounts();
   }, [messages, activeChats]);
 
-  // ✅ Otomatik yenileme (3 saniye)
+  // ✅ Otomatik yenileme (2 saniye - daha hızlı bildirim için)
   useEffect(() => {
     const interval = setInterval(() => {
       if (chatType === 'general') {
@@ -374,7 +391,7 @@ const Chat = () => {
       } else if (chatType === 'group' && selectedGroup) {
         fetchGroupMessages(selectedGroup);
       }
-    }, 3000);
+    }, 2000);
     return () => clearInterval(interval);
   }, [chatType, selectedUser, selectedGroup]);
 
@@ -492,7 +509,7 @@ const Chat = () => {
                     <div className="min-w-0">
                       <span className="text-sm font-medium text-gray-700 truncate block">
                         {chat.name}
-                        {unread > 0 && <span className="ml-2 text-xs text-red-500 font-bold">●</span>}
+                        {unread > 0 && <span className="ml-2 text-xs text-red-500 font-bold animate-pulse">●</span>}
                       </span>
                       {chat.role && chat.type === 'private' && (
                         <span className="text-xs text-gray-400 truncate block">{chat.role}</span>
@@ -576,15 +593,15 @@ const Chat = () => {
             </div>
           </div>
 
-          {/* ✅ Mesaj Listesi - WhatsApp Tarzı */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {/* ✅ Mesaj Listesi - En yeni en üstte */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-3" ref={messagesContainerRef}>
             {messages.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-gray-400">Henüz mesaj yok</p>
                 <p className="text-sm text-gray-300 mt-1">İlk mesajı sen gönder!</p>
               </div>
             ) : (
-              // ✅ En yeni mesaj en üstte (WhatsApp tarzı)
+              // ✅ En yeni mesaj en üstte
               messages.map((message) => {
                 const isOwn = message.sender?._id === user._id;
                 const unread = isUnread(message);
@@ -600,7 +617,7 @@ const Chat = () => {
                         isOwn
                           ? 'bg-blue-500 text-white'
                           : unread
-                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400 hover:ring-3' // ✅ OKUNMAMIŞ - KOYU RENK
+                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400' // ✅ OKUNMAMIŞ - KOYU RENK
                           : 'bg-white text-gray-900 border border-gray-200 hover:shadow-md' // ✅ OKUNDU - AÇIK RENK
                       }`}
                     >
@@ -637,7 +654,6 @@ const Chat = () => {
                 );
               })
             )}
-            <div ref={messagesEndRef} />
           </div>
 
           {/* Mesaj Gönderme */}
