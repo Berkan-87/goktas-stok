@@ -53,6 +53,7 @@ const Transfer = () => {
 
   // ✅ Verileri getir
   useEffect(() => {
+    console.log('🔄 Transfer component mount edildi');
     fetchData();
   }, []);
 
@@ -60,15 +61,18 @@ const Transfer = () => {
     try {
       setLoading(true);
 
-      // Token kontrolü
       const token = localStorage.getItem('token');
+      console.log('🔑 Token:', token ? '✅ Var' : '❌ Yok');
+      
       if (!token) {
         toast.error('Oturum açmamışsınız!');
+        setLoading(false);
         return;
       }
 
       console.log('📡 Veriler çekiliyor...');
 
+      // ✅ Tüm verileri paralel çek
       const [productsRes, stocksRes, transfersRes, pendingRes] = await Promise.all([
         axios.get('/products'),
         axios.get('/stock'),
@@ -77,15 +81,22 @@ const Transfer = () => {
       ]);
 
       console.log('📦 Gelen ürünler:', productsRes.data);
-      console.log(`📦 Ürün sayısı: ${productsRes.data?.length || 0}`);
+      console.log('📦 Toplam ürün sayısı:', productsRes.data?.length || 0);
+      console.log('📊 Gelen stoklar:', stocksRes.data);
+      console.log('📊 Toplam stok sayısı:', stocksRes.data?.length || 0);
+      
+      // ✅ Kategorilere göre say
+      const kanatlar = productsRes.data?.filter(p => p.category === 'kanat') || [];
+      const kasalar = productsRes.data?.filter(p => p.category === 'kasa') || [];
+      const basliklar = productsRes.data?.filter(p => p.category === 'baslik') || [];
+      console.log(`🚪 Kanat: ${kanatlar.length}, 🪟 Kasa: ${kasalar.length}, 🎯 Başlık: ${basliklar.length}`);
 
-      // ✅ State'leri güncelle - her zaman dizi olarak
+      // ✅ State'leri güncelle
       setProducts(productsRes.data || []);
       setStocks(stocksRes.data || []);
       setTransfers(transfersRes.data || []);
       setPendingTransfers(pendingRes.data || []);
 
-      // ✅ Ürün yoksa uyarı
       if (!productsRes.data || productsRes.data.length === 0) {
         toast.error('⚠️ Sistemde hiç ürün bulunmuyor! Lütfen önce ürün ekleyin.');
       } else {
@@ -94,16 +105,30 @@ const Transfer = () => {
 
     } catch (error) {
       console.error('❌ Veri çekme hatası:', error);
-      console.error('Hata detayı:', error.response?.data || error.message);
-      toast.error(error.response?.data?.message || 'Veriler alınamadı');
+      console.error('❌ Status:', error.response?.status);
+      console.error('❌ Data:', error.response?.data);
+      
+      if (error.response?.status === 401) {
+        toast.error('Oturumunuz sona ermiş! Lütfen tekrar girin.');
+        localStorage.removeItem('token');
+        setTimeout(() => window.location.href = '/login', 2000);
+      } else {
+        toast.error(error.response?.data?.message || 'Veriler alınamadı');
+      }
     } finally {
       setLoading(false);
     }
   };
 
+  // ✅ Düzeltilmiş getProductStock
   const getProductStock = (productId, branch) => {
     if (!productId || !stocks || stocks.length === 0) return 0;
-    const stock = stocks.find(s => s.productId?._id === productId && s.branch === branch);
+    
+    const stock = stocks.find(s => {
+      const stockProductId = s.productId?._id || s.productId;
+      return stockProductId?.toString() === productId?.toString() && s.branch === branch;
+    });
+    
     return stock ? stock.quantity : 0;
   };
 
@@ -275,6 +300,27 @@ const Transfer = () => {
         </div>
       </div>
 
+      {/* ✅ Debug Bilgisi */}
+      <div className="bg-gray-100 p-3 rounded-lg text-xs text-gray-600 flex flex-wrap items-center gap-4">
+        <span>📦 Ürün: <strong className="text-blue-600">{products.length}</strong></span>
+        <span>📊 Stok: <strong className="text-green-600">{stocks.length}</strong></span>
+        <span>🚪 Kanat: <strong className="text-blue-600">{products.filter(p => p.category === 'kanat').length}</strong></span>
+        <span>🪟 Kasa: <strong className="text-purple-600">{products.filter(p => p.category === 'kasa').length}</strong></span>
+        <span>🎯 Başlık: <strong className="text-green-600">{products.filter(p => p.category === 'baslik').length}</strong></span>
+        <button
+          onClick={fetchData}
+          className="text-blue-500 hover:text-blue-700 underline font-medium"
+        >
+          🔄 Yenile
+        </button>
+        {products.length > 0 && (
+          <span className="text-green-600 font-medium">✅ Ürünler yüklendi!</span>
+        )}
+        {products.length === 0 && (
+          <span className="text-red-600 font-medium">⚠️ Ürün yok!</span>
+        )}
+      </div>
+
       {/* Sekmeler */}
       <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
         <button
@@ -361,7 +407,7 @@ const Transfer = () => {
               </div>
             )}
 
-            {/* ✅ Ürün Seçimi - DÜZELTİLDİ */}
+            {/* ✅ Ürün Seçimi */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Ürün <span className="text-red-500">*</span>
@@ -394,7 +440,6 @@ const Transfer = () => {
                 )}
               </select>
 
-              {/* ✅ Debug - Kaç ürün var? */}
               <div className="flex items-center gap-2 mt-1">
                 <p className="text-xs text-gray-400">
                   Toplam ürün: <strong>{products?.length || 0}</strong>
@@ -403,7 +448,7 @@ const Transfer = () => {
                   <button
                     type="button"
                     onClick={() => {
-                      console.log('📦 Products:', products);
+                      console.log('📦 Tüm Ürünler:', products);
                       toast.success(`${products.length} ürün mevcut`);
                     }}
                     className="text-xs text-blue-500 hover:text-blue-700 underline"
