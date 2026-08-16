@@ -1,3 +1,4 @@
+// routes/messages.js
 const express = require('express');
 const router = express.Router();
 const Message = require('../models/Message');
@@ -27,14 +28,13 @@ router.post('/', auth, async (req, res) => {
       }
     }
 
-    // ✅ Yeni mesaj oluştururken, gönderen kendisi zaten okuduğu için readBy'ya kendini ekle.
     const message = new Message({
       sender: req.user._id,
       receiver: receiver || null,
       group: group || null,
       content,
       type: 'text',
-      readBy: [req.user._id] // Gönderen mesajı kendisi okumuş sayılır.
+      readBy: [req.user._id]
     });
 
     await message.save();
@@ -50,11 +50,15 @@ router.post('/', auth, async (req, res) => {
   }
 });
 
-// 📌 Özel mesajları getir
+// 📌 Özel mesajları getir (SADECE GÖNDEREN VE ALICI)
 router.get('/private/:userId', auth, async (req, res) => {
   try {
     const { userId } = req.params;
+    
+    // ✅ Sadece iki kullanıcı arasındaki mesajlar
     const messages = await Message.find({
+      receiver: { $ne: null },
+      group: null,
       $or: [
         { sender: req.user._id, receiver: userId },
         { sender: userId, receiver: req.user._id }
@@ -62,7 +66,7 @@ router.get('/private/:userId', auth, async (req, res) => {
     })
       .populate('sender', 'username name')
       .populate('receiver', 'username name')
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: -1 }); // ✅ En yeni en üstte
 
     res.json(messages);
   } catch (error) {
@@ -79,7 +83,7 @@ router.get('/general', auth, async (req, res) => {
       group: null
     })
       .populate('sender', 'username name')
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: -1 }); // ✅ En yeni en üstte
 
     res.json(messages);
   } catch (error) {
@@ -104,7 +108,7 @@ router.get('/group/:groupId', auth, async (req, res) => {
 
     const messages = await Message.find({ group: groupId })
       .populate('sender', 'username name')
-      .sort({ createdAt: 1 });
+      .sort({ createdAt: -1 }); // ✅ En yeni en üstte
 
     res.json(messages);
   } catch (error) {
@@ -113,7 +117,7 @@ router.get('/group/:groupId', auth, async (req, res) => {
   }
 });
 
-// ✅ TEK MESAJI OKUNDU İŞARETLE (Tek tek okutmak isterseniz)
+// ✅ TEK MESAJI OKUNDU İŞARETLE
 router.put('/read/:messageId', auth, async (req, res) => {
   try {
     const message = await Message.findById(req.params.messageId);
@@ -133,42 +137,33 @@ router.put('/read/:messageId', auth, async (req, res) => {
   }
 });
 
-// ✅ [YENİ] BİR SOHBETTEKİ TÜM MESAJLARI OKUNDU İŞARETLE (Performanslı)
+// ✅ TÜM MESAJLARI OKUNDU İŞARETLE
 router.put('/mark-all-read', auth, async (req, res) => {
   try {
     const { receiver, group } = req.body;
     let filter = {};
 
-    // Genel sohbet
     if (!receiver && !group) {
       filter = { receiver: null, group: null };
-    } 
-    // Özel sohbet
-    else if (receiver) {
+    } else if (receiver) {
       filter = {
-        $or: [
-          { sender: req.user._id, receiver: receiver },
-          { sender: receiver, receiver: req.user._id }
-        ]
+        receiver: receiver,
+        sender: req.user._id
       };
-    } 
-    // Grup sohbeti
-    else if (group) {
+    } else if (group) {
       filter = { group };
     }
 
-    // Kullanıcının okumadığı mesajları bul
     const unreadMessages = await Message.find({
       ...filter,
-      readBy: { $ne: req.user._id } // readBy dizisinde kullanıcı ID'si OLMAYANLAR
+      readBy: { $ne: req.user._id }
     });
 
-    // Toplu güncelleme (Her birine tek tek push atmak yerine)
     const idsToUpdate = unreadMessages.map(m => m._id);
     if (idsToUpdate.length > 0) {
       await Message.updateMany(
         { _id: { $in: idsToUpdate } },
-        { $addToSet: { readBy: req.user._id } } // ID zaten varsa ekleme
+        { $addToSet: { readBy: req.user._id } }
       );
     }
 
@@ -178,6 +173,36 @@ router.put('/mark-all-read', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Toplu okuma hatası:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// ✅ OKUNMAMIŞ MESAJ SAYISI
+router.get('/unread-count', auth, async (req, res) => {
+  try {
+    // Özel mesajlardaki okunmamış sayısı
+    const privateUnread = await Message.countDocuments({
+      receiver: req.user._id,
+      readBy: { $ne: req.user._id }
+    });
+
+    // Grup mesajlarındaki okunmamış sayısı
+    const groups = await Group.find({ members: req.user._id });
+    const groupIds = groups.map(g => g._id);
+    
+    const groupUnread = await Message.countDocuments({
+      group: { $in: groupIds },
+      readBy: { $ne: req.user._id },
+      sender: { $ne: req.user._id }
+    });
+
+    res.json({
+      total: privateUnread + groupUnread,
+      private: privateUnread,
+      group: groupUnread
+    });
+  } catch (error) {
+    console.error('❌ Okunmamış sayısı alınamadı:', error);
     res.status(500).json({ message: error.message });
   }
 });
