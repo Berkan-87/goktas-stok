@@ -1,3 +1,4 @@
+// backend/models/History.js
 const mongoose = require('mongoose');
 
 const historySchema = new mongoose.Schema({
@@ -8,47 +9,34 @@ const historySchema = new mongoose.Schema({
   },
   branch: {
     type: String,
-    required: true,
-    enum: ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka']
+    enum: ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka'],
+    required: true
   },
   type: {
     type: String,
-    required: true,
-    enum: ['in', 'out', 'transfer']
+    enum: ['in', 'out', 'transfer'],
+    required: true
   },
   quantity: {
     type: Number,
-    required: true
-  },
-  fromBranch: {
-    type: String,
-    enum: ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka'],
-    default: null
-  },
-  toBranch: {
-    type: String,
-    enum: ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka'],
-    default: null
-  },
-  user: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
     required: true
   },
   note: {
     type: String,
     default: ''
   },
+  user: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
   createdAt: {
     type: Date,
     default: Date.now
   }
-});
+}, { timestamps: true });
 
-// İndeksler - sorguları hızlandırır
-historySchema.index({ branch: 1, createdAt: -1 });
-historySchema.index({ productId: 1 });
-historySchema.index({ user: 1 });
-historySchema.index({ type: 1 });
+// İndeksler
+historySchema.index({ productId: 1, branch: 1 });
+historySchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('History', historySchema);

@@ -18,7 +18,7 @@ const History = () => {
   const { user } = useSelector((state) => state.auth);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('all'); // all, in, out, transfer
+  const [filter, setFilter] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
   const [dateRange, setDateRange] = useState('7days');
 
@@ -61,7 +61,6 @@ const History = () => {
     }
   };
 
-  // ✅ Excel Export
   const handleExportExcel = () => {
     if (history.length === 0) {
       toast.error('Export yapılacak veri bulunamadı!');
@@ -85,7 +84,6 @@ const History = () => {
     }
   };
 
-  // ✅ PDF Export
   const handleExportPDF = () => {
     if (history.length === 0) {
       toast.error('Export yapılacak veri bulunamadı!');

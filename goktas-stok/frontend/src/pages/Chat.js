@@ -237,7 +237,7 @@ const Chat = () => {
     }
   };
 
-  // ✅ Sohbet listesini en son mesaja göre sırala (WhatsApp tarzı)
+  // ✅ Sohbet listesini en son mesaja göre sırala
   const reorderChats = () => {
     setActiveChats(prev => {
       if (!prev || prev.length === 0) return prev;
@@ -299,6 +299,13 @@ const Chat = () => {
       })));
       
       updateUnreadCounts();
+      
+      // ✅ Badge'i sıfırla
+      const response = await axios.get('/messages/unread-count');
+      const count = response.data?.total || 0;
+      localStorage.setItem('chatUnreadCount', String(count));
+      window.dispatchEvent(new Event('storage'));
+      
       toast.success('Tüm mesajlar okundu olarak işaretlendi');
     } catch (error) {
       console.error('Okundu işaretleme hatası:', error);
@@ -319,12 +326,18 @@ const Chat = () => {
       
       updateUnreadCounts();
       
+      // ✅ Badge'i güncelle
+      const response = await axios.get('/messages/unread-count');
+      const count = response.data?.total || 0;
+      localStorage.setItem('chatUnreadCount', String(count));
+      window.dispatchEvent(new Event('storage'));
+      
     } catch (error) {
       console.error('Mesaj okuma hatası:', error);
     }
   };
 
-  // ✅ Okunmamış sayılarını güncelle - DÜZELTİLDİ
+  // ✅ Okunmamış sayılarını güncelle
   const updateUnreadCounts = () => {
     if (!activeChats || activeChats.length === 0) return;
     

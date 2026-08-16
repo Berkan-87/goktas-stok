@@ -1,57 +1,66 @@
+// backend/routes/history.js
 const express = require('express');
 const router = express.Router();
-const Transaction = require('../models/Transfer');
+const History = require('../models/History');
 const auth = require('../middleware/auth');
 
-// Tüm işlem geçmişini getir
+// 📌 Geçmiş verilerini getir
 router.get('/', auth, async (req, res) => {
   try {
-    const { branch, type, startDate, endDate, productId } = req.query;
-    
-    let filter = {};
-    
-    if (branch) {
-      filter.$or = [{ fromBranch: branch }, { toBranch: branch }];
+    const { type, branch, dateRange } = req.query;
+    const filter = {};
+
+    // İşlem tipi filtresi
+    if (type && type !== 'all') {
+      filter.type = type;
     }
-    
-    if (type) filter.type = type;
-    if (productId) filter.productId = productId;
-    
-    if (startDate || endDate) {
-      filter.createdAt = {};
-      if (startDate) filter.createdAt.$gte = new Date(startDate);
-      if (endDate) filter.createdAt.$lte = new Date(endDate);
+
+    // Şube filtresi
+    if (branch && branch !== 'all') {
+      filter.branch = branch;
     }
-    
-    const transactions = await Transaction.find(filter)
-      .populate('productId', 'code name')
+
+    // Tarih filtresi
+    if (dateRange && dateRange !== 'all') {
+      const now = new Date();
+      let startDate = new Date();
+      
+      switch(dateRange) {
+        case 'today':
+          startDate.setHours(0, 0, 0, 0);
+          break;
+        case '7days':
+          startDate.setDate(now.getDate() - 7);
+          break;
+        case '30days':
+          startDate.setDate(now.getDate() - 30);
+          break;
+        case '90days':
+          startDate.setDate(now.getDate() - 90);
+          break;
+        default:
+          break;
+      }
+      
+      filter.createdAt = { $gte: startDate };
+    }
+
+    // Admin değilse sadece kendi şubesini görsün
+    if (req.user.role !== 'admin' && req.user.branch) {
+      filter.branch = req.user.branch;
+    }
+
+    const history = await History.find(filter)
+      .populate('productId', 'name category color')
       .populate('user', 'name username')
       .sort({ createdAt: -1 })
       .limit(1000);
-    
-    res.json(transactions);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
-  }
-});
 
-// Belirli bir şubenin geçmişini getir
-router.get('/branch/:branch', auth, async (req, res) => {
-  try {
-    const { branch } = req.params;
-    const transactions = await Transaction.find({
-      $or: [{ fromBranch: branch }, { toBranch: branch }]
-    })
-      .populate('productId', 'code name')
-      .populate('user', 'name username')
-      .sort({ createdAt: -1 })
-      .limit(500);
-    
-    res.json(transactions);
+    console.log(`📊 ${history.length} geçmiş kaydı gönderildi`);
+    res.json(history);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Sunucu hatası' });
+    console.error('❌ Geçmiş verileri alınamadı:', error);
+    res.status(500).json({ message: error.message });
   }
 });
 
