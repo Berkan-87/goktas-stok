@@ -21,23 +21,43 @@ router.post('/', auth, authorize.admin, async (req, res) => {
   try {
     console.log('📥 Yeni ürün isteği:', req.body);
     
-    const { code, name, description, unit, category } = req.body;
+    const { name, description, unit, category, color } = req.body;
     const productCategory = category || 'kanat';
     
-    // Geçerli kategori mi kontrol et
-    if (!['kanat', 'kasa'].includes(productCategory)) {
+    // ✅ GEÇERLİ KATEGORİ KONTROLÜ - baslik EKLENDİ
+    const validCategories = ['kanat', 'kasa', 'baslik'];
+    if (!validCategories.includes(productCategory)) {
       return res.status(400).json({ 
-        message: 'Geçersiz kategori. Lütfen "kanat" veya "kasa" seçin.' 
+        message: `Geçersiz kategori. Geçerli kategoriler: ${validCategories.join(', ')}` 
       });
     }
-    
-    // Ürünü oluştur
+
+    // ✅ Renk kontrolü (Kasa ve Başlık için zorunlu)
+    if ((productCategory === 'kasa' || productCategory === 'baslik') && !color) {
+      return res.status(400).json({ 
+        message: 'Kasa ve Başlık kategorileri için renk seçimi zorunludur' 
+      });
+    }
+
+    // ✅ Aynı isimde ürün var mı kontrol et
+    const existingProduct = await Product.findOne({ 
+      name, 
+      category: productCategory,
+      color: color || null
+    });
+    if (existingProduct) {
+      return res.status(400).json({ 
+        message: 'Bu isimde, kategoride ve renkte zaten bir ürün var' 
+      });
+    }
+
+    // ✅ Ürünü oluştur
     const product = new Product({
-      code,
       name,
       description: description || '',
       unit: unit || 'adet',
       category: productCategory,
+      color: color || null,
       isActive: true
     });
     
@@ -49,7 +69,7 @@ router.post('/', auth, authorize.admin, async (req, res) => {
     const stockEntries = branches.map(branch => ({
       productId: product._id,
       branch,
-      quantity: 0, // Başlangıçta 0 stok
+      quantity: 0,
       criticalLevel: 10
     }));
     
@@ -59,9 +79,6 @@ router.post('/', auth, authorize.admin, async (req, res) => {
     res.status(201).json(product);
   } catch (error) {
     console.error('❌ Ürün eklenirken hata:', error);
-    if (error.code === 11000) {
-      return res.status(400).json({ message: 'Bu kod ile zaten bir ürün var.' });
-    }
     res.status(400).json({ message: error.message });
   }
 });
@@ -69,22 +86,37 @@ router.post('/', auth, authorize.admin, async (req, res) => {
 // 📌 Ürün güncelle
 router.put('/:id', auth, authorize.admin, async (req, res) => {
   try {
-    const { name, code, description, category, isActive } = req.body;
+    const { name, description, category, color, isActive } = req.body;
     
     const product = await Product.findById(req.params.id);
     if (!product) {
       return res.status(404).json({ message: 'Ürün bulunamadı' });
     }
     
-    if (name) product.name = name;
-    if (code) product.code = code;
-    if (description !== undefined) product.description = description;
+    // ✅ Kategori kontrolü
     if (category) {
-      if (!['kanat', 'kasa'].includes(category)) {
-        return res.status(400).json({ message: 'Geçersiz kategori' });
+      const validCategories = ['kanat', 'kasa', 'baslik'];
+      if (!validCategories.includes(category)) {
+        return res.status(400).json({ 
+          message: `Geçersiz kategori. Geçerli kategoriler: ${validCategories.join(', ')}` 
+        });
       }
       product.category = category;
     }
+
+    // ✅ Renk kontrolü
+    if (color !== undefined) {
+      const validColors = ['bute_beyaz', 'koyu_gri', 'acik_gri', 'tas_gri', null];
+      if (!validColors.includes(color)) {
+        return res.status(400).json({ 
+          message: 'Geçersiz renk. Geçerli renkler: Bute Beyaz, Koyu Gri, Açık Gri, Taş Gri' 
+        });
+      }
+      product.color = color;
+    }
+    
+    if (name) product.name = name;
+    if (description !== undefined) product.description = description;
     if (isActive !== undefined) product.isActive = isActive;
     
     await product.save();

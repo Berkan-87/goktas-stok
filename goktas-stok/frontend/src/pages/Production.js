@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
 import axios from '../utils/axios';
@@ -10,7 +10,10 @@ import {
   XMarkIcon,
   TrashIcon,
   ChevronDownIcon,
-  ChevronUpIcon
+  ChevronUpIcon,
+  MagnifyingGlassIcon,
+  FunnelIcon,
+  XCircleIcon
 } from '@heroicons/react/24/outline';
 import { format } from 'date-fns';
 import { tr } from 'date-fns/locale';
@@ -36,8 +39,13 @@ const Production = () => {
     startStage: 'planlama'
   });
   const [loading, setLoading] = useState(false);
+  
+  // ✅ ARAMA VE FİLTRE STATE'LERİ
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStage, setFilterStage] = useState('all');
+  const [showFilters, setShowFilters] = useState(false);
 
-  // 🎯 Aşama tanımları - TÜM AŞAMALAR TEK BİR YERDE
+  // 🎯 Aşama tanımları
   const allStages = [
     { id: 'planlama', label: '📋 Planlama', icon: '📋', nextStage: 'uretim' },
     { id: 'uretim', label: '⚙️ Üretim', icon: '⚙️', nextStage: 'paketleme' },
@@ -47,13 +55,42 @@ const Production = () => {
     { id: 'tamamlandi', label: '✅ Tamamlandı', icon: '✅', nextStage: null }
   ];
 
-  // Bölüm bazında aşamalar
   const productionStages = allStages.filter(s => ['planlama', 'uretim', 'paketleme'].includes(s.id));
   const stockStages = allStages.filter(s => ['depo_hazirlik'].includes(s.id));
   const sevkStages = allStages.filter(s => ['sevk_alani'].includes(s.id));
   const completedStages = allStages.filter(s => ['tamamlandi'].includes(s.id));
 
-  // Kullanıcının yetkili olduğu aşamalar
+  // ✅ Filtrelenmiş siparişler
+  const filteredOrders = useMemo(() => {
+    if (!searchTerm.trim() && filterStage === 'all') {
+      return orders;
+    }
+    
+    return orders.filter(order => {
+      // Arama filtresi
+      const searchLower = searchTerm.toLowerCase().trim();
+      let matchesSearch = true;
+      
+      if (searchLower) {
+        matchesSearch = 
+          order.orderNo?.toLowerCase().includes(searchLower) ||
+          order.customer?.toLowerCase().includes(searchLower) ||
+          order.model?.toLowerCase().includes(searchLower) ||
+          order.color?.toLowerCase().includes(searchLower) ||
+          order.note?.toLowerCase().includes(searchLower);
+      }
+      
+      // Aşama filtresi
+      let matchesStage = true;
+      if (filterStage !== 'all') {
+        matchesStage = order.stage === filterStage;
+      }
+      
+      return matchesSearch && matchesStage;
+    });
+  }, [orders, searchTerm, filterStage]);
+
+  // ✅ Kullanıcının yetkili olduğu aşamalar
   const getUserStages = () => {
     if (user?.role === 'admin') return allStages.map(s => s.id);
     if (user?.role === 'production_manager') {
@@ -111,7 +148,7 @@ const Production = () => {
         color: newOrder.color,
         quantity: parseInt(newOrder.quantity),
         note: newOrder.note,
-        startStage: newOrder.startStage // Backend bu alanı kullanacak
+        startStage: newOrder.startStage
       });
       console.log('✅ Sipariş eklendi:', response.data);
       toast.success('Sipariş başarıyla eklendi');
@@ -145,9 +182,7 @@ const Production = () => {
     }
   };
 
-  // 🎯 DÜZELTİLDİ: handleMoveStage
   const handleMoveStage = async (orderId, currentStage) => {
-    // currentStage'e göre nextStage'i bul
     const stage = allStages.find(s => s.id === currentStage);
     if (!stage || !stage.nextStage) {
       toast.error('Sipariş zaten son aşamada!');
@@ -193,7 +228,7 @@ const Production = () => {
   };
 
   const getOrdersByStage = (stageId) => {
-    return orders.filter(order => order.stage === stageId);
+    return filteredOrders.filter(order => order.stage === stageId);
   };
 
   const toggleSection = (section) => {
@@ -204,6 +239,16 @@ const Production = () => {
   };
 
   const canAdd = user?.role === 'admin' || user?.role === 'branch_manager' || user?.productionRole === 'planlama';
+
+  // ✅ Arama temizleme
+  const clearSearch = () => {
+    setSearchTerm('');
+    setFilterStage('all');
+  };
+
+  // ✅ Arama sonucu bulunan sipariş sayısı
+  const totalFiltered = filteredOrders.length;
+  const totalOrders = orders.length;
 
   // ✅ Mobil Kart Bileşeni
   const MobileOrderCard = ({ order, stageId }) => {
@@ -355,7 +400,8 @@ const Production = () => {
               📦 GELEN SİPARİŞ
             </h2>
             <p className="text-green-600 text-sm mt-1">
-              Toplam: {orders.length} aktif sipariş
+              Toplam: {totalOrders} aktif sipariş
+              {searchTerm || filterStage !== 'all' ? ` • Filtrelenmiş: ${totalFiltered}` : ''}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -376,6 +422,87 @@ const Production = () => {
             )}
           </div>
         </div>
+
+        {/* ✅ ARAMA ÇUBUĞU */}
+        <div className="mt-4 flex flex-col sm:flex-row gap-3">
+          <div className="flex-1 relative">
+            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+              <MagnifyingGlassIcon className="h-5 w-5 text-gray-400" />
+            </div>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Sipariş No, Müşteri, Model, Renk veya Not ile ara..."
+              className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm bg-white"
+            />
+            {searchTerm && (
+              <button
+                onClick={clearSearch}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center"
+              >
+                <XCircleIcon className="h-5 w-5 text-gray-400 hover:text-gray-600" />
+              </button>
+            )}
+          </div>
+          
+          <div className="flex gap-2">
+            {/* Filtre Butonu */}
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`px-3 py-2.5 rounded-lg border text-sm flex items-center gap-2 transition ${
+                filterStage !== 'all' 
+                  ? 'bg-blue-100 border-blue-300 text-blue-700' 
+                  : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              <FunnelIcon className="h-4 w-4" />
+              {filterStage !== 'all' ? 'Filtre Aktif' : 'Filtre'}
+              {filterStage !== 'all' && (
+                <span className="bg-blue-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  1
+                </span>
+              )}
+            </button>
+
+            {/* Filtre Dropdown */}
+            {showFilters && (
+              <div className="relative">
+                <div className="absolute right-0 top-12 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20 p-2">
+                  <div className="text-xs font-medium text-gray-500 px-2 py-1">Aşama Filtresi</div>
+                  <button
+                    onClick={() => { setFilterStage('all'); setShowFilters(false); }}
+                    className={`w-full text-left px-3 py-1.5 text-sm rounded hover:bg-gray-50 ${filterStage === 'all' ? 'bg-blue-50 text-blue-600' : ''}`}
+                  >
+                    Tümü
+                  </button>
+                  {allStages.map(stage => (
+                    <button
+                      key={stage.id}
+                      onClick={() => { setFilterStage(stage.id); setShowFilters(false); }}
+                      className={`w-full text-left px-3 py-1.5 text-sm rounded hover:bg-gray-50 ${filterStage === stage.id ? 'bg-blue-50 text-blue-600' : ''}`}
+                    >
+                      {stage.icon} {stage.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Arama sonuçları özeti */}
+        {(searchTerm || filterStage !== 'all') && (
+          <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
+            <span>🔍 {totalFiltered} sipariş bulundu</span>
+            <button
+              onClick={clearSearch}
+              className="text-blue-600 hover:text-blue-800 font-medium"
+            >
+              Filtreleri Temizle
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ÜRETİM BÖLÜMÜ */}
