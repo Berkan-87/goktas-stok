@@ -7,10 +7,6 @@ import {
   CheckCircleIcon,
   XCircleIcon,
   ClockIcon,
-  UserIcon,
-  BuildingStorefrontIcon,
-  CubeIcon,
-  EyeIcon,
   CheckIcon,
   XMarkIcon,
   ArrowPathIcon
@@ -23,9 +19,8 @@ const Transfer = () => {
   const [stocks, setStocks] = useState([]);
   const [transfers, setTransfers] = useState([]);
   const [pendingTransfers, setPendingTransfers] = useState([]);
-  const [activeTab, setActiveTab] = useState('request'); // 'request' | 'pending' | 'history'
+  const [activeTab, setActiveTab] = useState('request');
   
-  // ✅ Transfer Form State
   const [formData, setFormData] = useState({
     sourceBranch: 'fabrika',
     targetBranch: user?.branch || '',
@@ -34,7 +29,6 @@ const Transfer = () => {
     note: ''
   });
   
-  // ✅ Filtreleme
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
   
@@ -56,8 +50,8 @@ const Transfer = () => {
   ];
 
   const isFabrika = user?.role === 'admin' || user?.branch === 'fabrika';
-  const isBranchManager = user?.role === 'branch_manager';
 
+  // ✅ Verileri getir
   useEffect(() => {
     fetchData();
   }, []);
@@ -65,6 +59,16 @@ const Transfer = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
+      
+      // Token kontrolü
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Oturum açmamışsınız!');
+        return;
+      }
+
+      console.log('📡 Veriler çekiliyor...');
+
       const [productsRes, stocksRes, transfersRes, pendingRes] = await Promise.all([
         axios.get('/products'),
         axios.get('/stock'),
@@ -72,30 +76,42 @@ const Transfer = () => {
         axios.get('/transfers/pending')
       ]);
       
-      setProducts(productsRes.data);
-      setStocks(stocksRes.data);
-      setTransfers(transfersRes.data);
-      setPendingTransfers(pendingRes.data);
+      console.log('📦 Gelen ürünler:', productsRes.data);
+      console.log(`📦 Ürün sayısı: ${productsRes.data?.length || 0}`);
+      
+      // ✅ State'leri güncelle - her zaman dizi olarak
+      setProducts(productsRes.data || []);
+      setStocks(stocksRes.data || []);
+      setTransfers(transfersRes.data || []);
+      setPendingTransfers(pendingRes.data || []);
+      
+      // ✅ Ürün yoksa uyarı
+      if (!productsRes.data || productsRes.data.length === 0) {
+        toast.error('⚠️ Sistemde hiç ürün bulunmuyor! Lütfen önce ürün ekleyin.');
+      } else {
+        toast.success(`✅ ${productsRes.data.length} ürün yüklendi`);
+      }
+      
     } catch (error) {
-      toast.error('Veriler alınamadı');
+      console.error('❌ Veri çekme hatası:', error);
+      console.error('Hata detayı:', error.response?.data || error.message);
+      toast.error(error.response?.data?.message || 'Veriler alınamadı');
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Mevcut stok kontrolü
   const getProductStock = (productId, branch) => {
+    if (!productId || !stocks || stocks.length === 0) return 0;
     const stock = stocks.find(s => s.productId?._id === productId && s.branch === branch);
     return stock ? stock.quantity : 0;
   };
 
-  // ✅ Seçili ürünün fabrika stoğu
   const getFactoryStock = () => {
     if (!formData.productId) return 0;
     return getProductStock(formData.productId, 'fabrika');
   };
 
-  // ✅ Transfer talebi oluştur
   const handleRequest = async (e) => {
     e.preventDefault();
     
@@ -121,7 +137,7 @@ const Transfer = () => {
     }
 
     try {
-      const response = await axios.post('/transfers', {
+      await axios.post('/transfers', {
         sourceBranch: 'fabrika',
         targetBranch: formData.targetBranch,
         productId: formData.productId,
@@ -146,7 +162,6 @@ const Transfer = () => {
     }
   };
 
-  // ✅ Transfer onayla (Fabrika)
   const handleApprove = async (transferId) => {
     if (!window.confirm('Bu transfer talebini onaylamak istediğinize emin misiniz?')) return;
     
@@ -159,7 +174,6 @@ const Transfer = () => {
     }
   };
 
-  // ✅ Transfer reddet (Fabrika)
   const handleReject = async (transferId) => {
     const reason = prompt('Reddetme sebebini girin:');
     if (reason === null) return;
@@ -173,7 +187,6 @@ const Transfer = () => {
     }
   };
 
-  // ✅ Transfer tamamla (Şube)
   const handleComplete = async (transferId) => {
     if (!window.confirm('Transferi teslim aldığınızı onaylıyor musunuz?')) return;
     
@@ -186,7 +199,6 @@ const Transfer = () => {
     }
   };
 
-  // ✅ Transfer iptal et
   const handleCancel = async (transferId) => {
     if (!window.confirm('Bu transfer talebini iptal etmek istediğinize emin misiniz?')) return;
     
@@ -199,7 +211,6 @@ const Transfer = () => {
     }
   };
 
-  // ✅ Filtrelenmiş transferler
   const getFilteredTransfers = () => {
     let filtered = transfers;
     
@@ -217,7 +228,6 @@ const Transfer = () => {
     return filtered;
   };
 
-  // ✅ Transfer durumu badge'i
   const getStatusBadge = (status) => {
     const badges = {
       pending: { color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon, label: '⏳ Beklemede' },
@@ -229,8 +239,8 @@ const Transfer = () => {
     return badges[status] || badges.pending;
   };
 
-  // ✅ Transferdeki ürün adını bul
   const getProductName = (productId) => {
+    if (!productId || !products || products.length === 0) return 'Ürün bulunamadı';
     const product = products.find(p => p._id === productId);
     return product ? product.name : 'Ürün bulunamadı';
   };
@@ -354,26 +364,63 @@ const Transfer = () => {
               </div>
             )}
 
+            {/* ✅ Ürün Seçimi - DÜZELTİLDİ */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Ürün <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.productId}
-                onChange={(e) => setFormData({ ...formData, productId: e.target.value, quantity: '' })}
+                onChange={(e) => {
+                  console.log('🔄 Seçilen ürün ID:', e.target.value);
+                  setFormData({ ...formData, productId: e.target.value, quantity: '' });
+                }}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               >
                 <option value="">Ürün seçin</option>
-                {products.map(product => (
-                  <option key={product._id} value={product._id}>
-                    {product.name} 
-                    {product.category === 'kanat' ? ' 🚪' : 
-                     product.category === 'kasa' ? ' 🪟' : ' 🎯'}
-                    {' - '}Fabrika: {getProductStock(product._id, 'fabrika')} adet
-                  </option>
-                ))}
+                {products && products.length > 0 ? (
+                  products.map(product => {
+                    const stock = getProductStock(product._id, 'fabrika');
+                    return (
+                      <option key={product._id} value={product._id}>
+                        {product.name} 
+                        {product.category === 'kanat' ? ' 🚪' : 
+                         product.category === 'kasa' ? ' 🪟' : ' 🎯'}
+                        {' - '}Fabrika: {stock} adet
+                        {stock === 0 && ' ⚠️ Stok yok'}
+                      </option>
+                    );
+                  })
+                ) : (
+                  <option value="" disabled>⚠️ Hiç ürün bulunamadı</option>
+                )}
               </select>
+              
+              {/* ✅ Debug - Kaç ürün var? */}
+              <div className="flex items-center gap-2 mt-1">
+                <p className="text-xs text-gray-400">
+                  Toplam ürün: <strong>{products?.length || 0}</strong>
+                </p>
+                {products && products.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      console.log('📦 Products:', products);
+                      toast.success(`${products.length} ürün mevcut`);
+                    }}
+                    className="text-xs text-blue-500 hover:text-blue-700 underline"
+                  >
+                    Ürünleri göster
+                  </button>
+                )}
+              </div>
+              
+              {(!products || products.length === 0) && (
+                <p className="text-sm text-red-500 mt-1">
+                  ⚠️ Sistemde hiç ürün yok! Lütfen önce ürün ekleyin.
+                </p>
+              )}
             </div>
 
             <div>
@@ -514,7 +561,6 @@ const Transfer = () => {
       {/* Transfer Geçmişi */}
       {activeTab === 'history' && (
         <div>
-          {/* Filtreler */}
           <div className="flex flex-wrap gap-3 mb-4">
             <div className="flex items-center gap-2">
               <label className="text-sm font-medium text-gray-700">Durum:</label>
@@ -554,7 +600,6 @@ const Transfer = () => {
             </button>
           </div>
 
-          {/* Transfer Listesi */}
           {getFilteredTransfers().length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
               <p className="text-lg text-gray-500">📋 Henüz transfer kaydı yok</p>
