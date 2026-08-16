@@ -18,6 +18,16 @@ const MaterialDepo = () => {
   const [selectedBranch, setSelectedBranch] = useState(user?.branch || 'fabrika');
   const [showAddModal, setShowAddModal] = useState(false);
   
+  // ✅ Stok Modal State
+  const [stockModal, setStockModal] = useState({
+    show: false,
+    materialId: null,
+    materialName: '',
+    currentStock: 0,
+    type: 'in', // 'in' veya 'out'
+    quantity: ''
+  });
+  
   const [newMaterial, setNewMaterial] = useState({
     name: '',
     unit: 'adet',
@@ -74,6 +84,59 @@ const MaterialDepo = () => {
     return materials.filter(m => m.category === category);
   };
 
+  // ✅ Stok Modal İşlemleri
+  const openStockModal = (material, type) => {
+    setStockModal({
+      show: true,
+      materialId: material._id,
+      materialName: material.name,
+      currentStock: material.stock,
+      type: type,
+      quantity: ''
+    });
+  };
+
+  const closeStockModal = () => {
+    setStockModal({
+      show: false,
+      materialId: null,
+      materialName: '',
+      currentStock: 0,
+      type: 'in',
+      quantity: ''
+    });
+  };
+
+  const handleStockChange = async (e) => {
+    e.preventDefault();
+    
+    const { materialId, type, quantity, currentStock } = stockModal;
+    
+    if (!quantity || quantity <= 0) {
+      toast.error('Geçerli bir miktar giriniz');
+      return;
+    }
+
+    const quantityNum = parseInt(quantity);
+    
+    // Çıkış kontrolü
+    if (type === 'out' && quantityNum > currentStock) {
+      toast.error(`Yeterli stok yok! Mevcut: ${currentStock}`);
+      return;
+    }
+
+    try {
+      const changeQuantity = type === 'in' ? quantityNum : -quantityNum;
+      await axios.put(`/materials/${materialId}/stock`, { quantity: changeQuantity });
+      toast.success(`✅ ${quantityNum} adet ${type === 'in' ? 'eklendi' : 'çıkarıldı'}`);
+      closeStockModal();
+      fetchMaterials();
+    } catch (error) {
+      console.error('❌ Stok güncelleme hatası:', error);
+      toast.error(error.response?.data?.message || 'Stok güncellenemedi');
+    }
+  };
+
   const handleAddMaterial = async (e) => {
     e.preventDefault();
     
@@ -97,7 +160,6 @@ const MaterialDepo = () => {
         unit: newMaterial.unit || 'adet'
       };
 
-      // Kategoriye özel alanlar
       if (activeTab === 'mdf') {
         payload.thickness = newMaterial.thickness || null;
         payload.size = newMaterial.size || null;
@@ -108,7 +170,7 @@ const MaterialDepo = () => {
 
       console.log('📦 Gönderilen payload:', payload);
 
-      const response = await axios.post('/materials', payload);
+      await axios.post('/materials', payload);
       toast.success('✅ Malzeme başarıyla eklendi');
       setShowAddModal(false);
       resetForm();
@@ -131,17 +193,6 @@ const MaterialDepo = () => {
       stock: 0,
       criticalLevel: 10
     });
-  };
-
-  const handleStockChange = async (id, quantity) => {
-    try {
-      await axios.put(`/materials/${id}/stock`, { quantity });
-      toast.success('✅ Stok güncellendi');
-      fetchMaterials();
-    } catch (error) {
-      console.error('❌ Stok güncelleme hatası:', error);
-      toast.error(error.response?.data?.message || 'Stok güncellenemedi');
-    }
   };
 
   const getStatusColor = (stock, critical) => {
@@ -306,20 +357,22 @@ const MaterialDepo = () => {
         <div className="mt-3 flex items-center justify-between">
           <span className="text-2xl font-bold text-gray-900">{material.stock}</span>
           <div className="flex gap-1">
+            {/* ✅ Stok Giriş Butonu - Modal Açar */}
             <button
-              onClick={() => handleStockChange(material._id, 1)}
+              onClick={() => openStockModal(material, 'in')}
               className="p-1.5 bg-green-100 text-green-600 rounded hover:bg-green-200 transition-colors"
               title="Stok Ekle"
             >
               <PlusIcon className="h-4 w-4" />
             </button>
+            {/* ✅ Stok Çıkış Butonu - Modal Açar */}
             <button
               onClick={() => {
                 if (material.stock <= 0) {
                   toast.error('Stok zaten 0');
                   return;
                 }
-                handleStockChange(material._id, -1);
+                openStockModal(material, 'out');
               }}
               className={`p-1.5 rounded transition-colors ${
                 material.stock <= 0 
@@ -418,6 +471,71 @@ const MaterialDepo = () => {
         )}
       </div>
 
+      {/* ✅ Stok Giriş/Çıkış Modalı */}
+      {stockModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">
+              {stockModal.type === 'in' ? '📥 Stok Girişi' : '📤 Stok Çıkışı'}
+            </h2>
+            
+            <p className="text-sm text-gray-600 mb-2">
+              <strong>Malzeme:</strong> {stockModal.materialName}
+            </p>
+            <div className="bg-blue-50 p-3 rounded-lg mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Mevcut Stok:</strong> {stockModal.currentStock} adet
+              </p>
+            </div>
+
+            <form onSubmit={handleStockChange} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  {stockModal.type === 'in' ? 'Eklenecek Miktar' : 'Çıkarılacak Miktar'} <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={stockModal.quantity}
+                  onChange={(e) => setStockModal({ ...stockModal, quantity: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Miktar girin"
+                  min="1"
+                  max={stockModal.type === 'out' ? stockModal.currentStock : undefined}
+                  required
+                  autoFocus
+                />
+                {stockModal.type === 'out' && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Maksimum: {stockModal.currentStock} adet
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  className={`flex-1 px-4 py-2 rounded-lg font-medium transition-colors ${
+                    stockModal.type === 'in' 
+                      ? 'bg-green-600 hover:bg-green-700 text-white' 
+                      : 'bg-red-600 hover:bg-red-700 text-white'
+                  }`}
+                >
+                  {stockModal.type === 'in' ? '✅ Ekle' : '❌ Çıkar'}
+                </button>
+                <button
+                  type="button"
+                  onClick={closeStockModal}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
+                >
+                  İptal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Yeni Malzeme Ekleme Modalı */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
