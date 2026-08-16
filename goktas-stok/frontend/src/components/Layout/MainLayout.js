@@ -11,7 +11,8 @@ import {
   ClockIcon,
   UserCircleIcon,
   Bars3Icon,
-  XMarkIcon
+  XMarkIcon,
+  BuildingStorefrontIcon
 } from '@heroicons/react/24/outline';
 
 const MainLayout = () => {
@@ -26,7 +27,8 @@ const MainLayout = () => {
     { name: 'Ana Sayfa', icon: HomeIcon, path: '/' },
     { name: 'Stoklar', icon: CubeIcon, path: '/stoklar' },
     { name: 'Siparişler', icon: ClipboardDocumentListIcon, path: '/uretim' },
-    { name: 'Transfer', icon: ArrowsRightLeftIcon, path: '/transfer' },
+    { name: 'Talep-Transfer', icon: ArrowsRightLeftIcon, path: '/transfer' },
+    { name: 'Malzeme Depo', icon: BuildingStorefrontIcon, path: '/malzeme-depo' }, // ✅ YENİ
     { name: 'İletişim', icon: ChatBubbleLeftRightIcon, path: '/sohbet' },
     { name: 'Geçmiş', icon: ClockIcon, path: '/gecmis' },
   ];
