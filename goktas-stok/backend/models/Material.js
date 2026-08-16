@@ -1,4 +1,4 @@
-// models/Material.js - KESİN ÇÖZÜM
+// models/Material.js
 const mongoose = require('mongoose');
 
 const materialSchema = new mongoose.Schema({
@@ -25,11 +25,21 @@ const materialSchema = new mongoose.Schema({
   thickness: { type: Number, default: null },
   size: { type: String, trim: true, default: null },
   
-  // Tutkal
+  // ✅ Tutkal - DÜZELTİLDİ
   glueType: {
     type: String,
     enum: ['iskelet', 'laminasyon', 'kenar_bant'],
-    default: null
+    default: null,
+    validate: {
+      validator: function(value) {
+        // Sadece glue kategorisi için zorunlu
+        if (this.category === 'glue') {
+          return value !== null && value !== undefined && value !== '';
+        }
+        return true;
+      },
+      message: 'Tutkal tipi seçimi zorunludur'
+    }
   },
   
   // Kenar Bant / PVC
@@ -62,39 +72,31 @@ const materialSchema = new mongoose.Schema({
 // ✅ Benzersiz indeks
 materialSchema.index({ category: 1, name: 1, branch: 1 }, { unique: true });
 
-// ✅ Pre-save middleware
+// ✅ Pre-save middleware - Kategoriye göre gereksiz alanları temizle
 materialSchema.pre('save', function(next) {
-  // Kategoriye göre gereksiz alanları temizle
+  // MDF değilse thickness ve size'ı temizle
   if (this.category !== 'mdf') {
     this.thickness = null;
     this.size = null;
   }
+  
+  // Tutkal değilse glueType'ı temizle
   if (this.category !== 'glue') {
     this.glueType = null;
   }
+  
+  // Kenar Bant veya PVC değilse renk alanlarını temizle
   if (this.category !== 'edgeband' && this.category !== 'pvc') {
     this.color = null;
     this.colorName = null;
   }
+  
+  // Tutkal ise glueType kontrol et
+  if (this.category === 'glue' && !this.glueType) {
+    return next(new Error('Tutkal tipi seçimi zorunludur'));
+  }
+  
   next();
 });
-
-// ✅ POST-save hata yakalama için statik metod
-materialSchema.statics.createWithValidation = async function(data) {
-  try {
-    // Kategoriye göre validasyon
-    if (data.category === 'glue' && !data.glueType) {
-      throw new Error('Tutkal tipi seçimi zorunludur');
-    }
-    if ((data.category === 'edgeband' || data.category === 'pvc') && !data.color) {
-      throw new Error('Renk seçimi zorunludur');
-    }
-    
-    const material = new this(data);
-    return await material.save();
-  } catch (error) {
-    throw error;
-  }
-};
 
 module.exports = mongoose.model('Material', materialSchema);

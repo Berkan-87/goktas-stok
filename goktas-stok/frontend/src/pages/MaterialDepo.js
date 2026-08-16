@@ -7,9 +7,6 @@ import {
   PlusIcon,
   MinusIcon,
   PlusCircleIcon,
-  TrashIcon,
-  PencilIcon,
-  CheckIcon,
   XMarkIcon
 } from '@heroicons/react/24/outline';
 
@@ -20,7 +17,6 @@ const MaterialDepo = () => {
   const [activeTab, setActiveTab] = useState('mdf');
   const [selectedBranch, setSelectedBranch] = useState(user?.branch || 'fabrika');
   const [showAddModal, setShowAddModal] = useState(false);
-  const [editingMaterial, setEditingMaterial] = useState(null);
   
   const [newMaterial, setNewMaterial] = useState({
     name: '',
@@ -86,6 +82,7 @@ const MaterialDepo = () => {
     return materials.filter(m => m.category === category);
   };
 
+  // ✅ handleAddMaterial - DÜZELTİLDİ
   const handleAddMaterial = async (e) => {
     e.preventDefault();
     
@@ -106,33 +103,42 @@ const MaterialDepo = () => {
     }
 
     try {
+      // ✅ Kategoriye göre payload hazırla
       const payload = {
-        ...newMaterial,
-        branch: selectedBranch,
+        name: newMaterial.name.trim(),
         category: activeTab,
+        branch: selectedBranch,
         stock: parseInt(newMaterial.stock) || 0,
-        criticalLevel: parseInt(newMaterial.criticalLevel) || 10
+        criticalLevel: parseInt(newMaterial.criticalLevel) || 10,
+        unit: newMaterial.unit || 'adet'
       };
 
-      // Kategoriye göre gereksiz alanları temizle
-      if (activeTab !== 'glue') delete payload.glueType;
-      if (activeTab !== 'mdf') {
-        delete payload.thickness;
-        delete payload.size;
-      }
-      if (activeTab !== 'edgeband' && activeTab !== 'pvc') {
-        delete payload.color;
-        delete payload.colorName;
+      // ✅ Sadece ilgili kategoriye özel alanları ekle
+      if (activeTab === 'mdf') {
+        payload.thickness = newMaterial.thickness || null;
+        payload.size = newMaterial.size || null;
+      } else if (activeTab === 'glue') {
+        payload.glueType = newMaterial.glueType;
+      } else if (activeTab === 'edgeband' || activeTab === 'pvc') {
+        payload.color = newMaterial.color;
+        payload.colorName = newMaterial.colorName || '';
       }
 
-      await axios.post('/materials', payload);
+      console.log('📦 Gönderilen payload:', payload);
+
+      const response = await axios.post('/materials', payload);
+      console.log('✅ Başarılı:', response.data);
+      
       toast.success('✅ Malzeme başarıyla eklendi');
       setShowAddModal(false);
       resetForm();
       fetchMaterials();
     } catch (error) {
       console.error('❌ Ekleme hatası:', error);
-      toast.error(error.response?.data?.message || 'Ekleme başarısız');
+      console.error('❌ Hata detayı:', error.response?.data);
+      
+      const errorMessage = error.response?.data?.message || 'Ekleme başarısız';
+      toast.error(errorMessage);
     }
   };
 
@@ -174,7 +180,7 @@ const MaterialDepo = () => {
     return '🟢 Yeterli';
   };
 
-  // Render Form
+  // Render Form - DÜZELTİLDİ
   const renderAddForm = () => {
     switch (activeTab) {
       case 'mdf':
