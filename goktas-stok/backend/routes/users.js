@@ -1,20 +1,15 @@
+// backend/routes/users.js
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
 const auth = require('../middleware/auth');
-const bcrypt = require('bcryptjs');
 
-// 📌 Tüm kullanıcıları getir (isActive durumuna bakılmaksızın)
+// 📌 Tüm kullanıcıları getir
 router.get('/', auth, async (req, res) => {
   try {
-    // ✅ TÜM kullanıcıları getir (isActive kontrolü yapma)
     const users = await User.find()
-      .select('username name role branch productionRole isActive')
+      .select('username name role branch productionRole materialDepoAccess isActive')
       .sort({ name: 1 });
-    
-    console.log('📱 Toplam kullanıcı:', users.length);
-    console.log('📱 Aktif kullanıcı:', users.filter(u => u.isActive).length);
-    
     res.json(users);
   } catch (error) {
     console.error('❌ Kullanıcılar getirilemedi:', error);
@@ -22,117 +17,130 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// 📌 Sadece aktif kullanıcıları getir (opsiyonel)
-router.get('/active', auth, async (req, res) => {
-  try {
-    const users = await User.find({ isActive: true })
-      .select('username name role branch productionRole')
-      .sort({ name: 1 });
-    res.json(users);
-  } catch (error) {
-    console.error('❌ Aktif kullanıcılar getirilemedi:', error);
-    res.status(500).json({ message: error.message });
-  }
-});
-
-// 📌 Yeni kullanıcı oluştur (EKLEME)
+// 📌 Yeni kullanıcı oluştur
 router.post('/', auth, async (req, res) => {
   try {
-    const { username, password, name, role, branch, productionRole } = req.body;
-
     // Admin kontrolü
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+      return res.status(403).json({ message: 'Bu işlem için admin yetkisi gereklidir' });
     }
 
+    const { username, password, name, role, branch, productionRole, materialDepoAccess } = req.body;
+
+    // Validasyon
+    if (!username || !password || !name || !role) {
+      return res.status(400).json({ message: 'Kullanıcı adı, şifre, isim ve rol zorunludur' });
+    }
+
+    // Kullanıcı adı kontrolü
     const existingUser = await User.findOne({ username });
     if (existingUser) {
       return res.status(400).json({ message: 'Bu kullanıcı adı zaten alınmış' });
     }
 
-    // ✅ Yeni kullanıcı oluştur - isActive varsayılan true
+    // Yeni kullanıcı oluştur
     const newUser = new User({
       username,
       password,
       name,
-      role: role || 'viewer',
-      branch: role === 'admin' ? null : branch,
+      role,
+      branch: role === 'admin' ? null : (branch || null),
       productionRole: role === 'production_manager' ? productionRole : null,
-      isActive: true // ✅ Varsayılan olarak aktif
+      materialDepoAccess: materialDepoAccess || false,
+      isActive: true
     });
 
     await newUser.save();
+    
+    // Şifreyi çıkararak cevap ver
     const userResponse = newUser.toObject();
     delete userResponse.password;
     
-    console.log('✅ Yeni kullanıcı oluşturuldu:', userResponse);
+    console.log('✅ Yeni kullanıcı oluşturuldu:', username);
     res.status(201).json(userResponse);
-
   } catch (error) {
     console.error('❌ Kullanıcı oluşturulamadı:', error);
-    res.status(500).json({ message: error.message || 'Kullanıcı oluşturulurken bir hata oluştu.' });
+    res.status(500).json({ message: error.message });
   }
 });
 
-// 📌 Kullanıcı Güncelleme (DÜZENLEME)
+// 📌 Kullanıcı güncelle
 router.put('/:id', auth, async (req, res) => {
   try {
-    const userId = req.params.id;
-    const { name, role, branch, productionRole, password, isActive } = req.body;
-
     // Admin kontrolü
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+      return res.status(403).json({ message: 'Bu işlem için admin yetkisi gereklidir' });
     }
+
+    const userId = req.params.id;
+    const { name, role, branch, productionRole, materialDepoAccess, password, isActive } = req.body;
 
     const user = await User.findById(userId);
     if (!user) {
       return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
     }
 
-    // Admin kullanıcı koruması
-    if (user.username === 'admin' && role !== 'admin') {
-      return res.status(400).json({ message: 'Admin kullanıcının rolü değiştirilemez!' });
+    // Admin koruması
+    if (user.username === 'admin') {
+      if (role && role !== 'admin') {
+        return res.status(400).json({ message: 'Admin kullanıcının rolü değiştirilemez!' });
+      }
+      if (isActive === false) {
+        return res.status(400).json({ message: 'Admin kullanıcı pasifleştirilemez!' });
+      }
     }
 
     // Güncellemeler
     if (name) user.name = name;
-    if (role) user.role = role;
-    if (branch !== undefined) user.branch = (role === 'admin') ? null : branch;
-    if (productionRole !== undefined) {
-      user.productionRole = (role === 'production_manager') ? productionRole : null;
+    
+    if (role) {
+      user.role = role;
+      user.branch = (role === 'admin') ? null : (branch || user.branch);
+      user.productionRole = (role === 'production_manager') ? (productionRole || user.productionRole) : null;
     }
-    if (isActive !== undefined) user.isActive = isActive;
-
+    
+    if (branch !== undefined && role !== 'admin') {
+      user.branch = branch;
+    }
+    
+    if (productionRole !== undefined && role === 'production_manager') {
+      user.productionRole = productionRole;
+    }
+    
+    if (materialDepoAccess !== undefined) {
+      user.materialDepoAccess = materialDepoAccess;
+    }
+    
+    if (isActive !== undefined) {
+      user.isActive = isActive;
+    }
+    
     if (password && password.length > 0) {
       user.password = password;
     }
 
     await user.save();
+    
     const userResponse = user.toObject();
     delete userResponse.password;
     
-    console.log('✅ Kullanıcı güncellendi:', userResponse);
+    console.log('✅ Kullanıcı güncellendi:', user.username);
     res.json(userResponse);
-
   } catch (error) {
     console.error('❌ Kullanıcı güncellenemedi:', error);
-    res.status(500).json({ message: error.message || 'Kullanıcı güncellenirken bir hata oluştu.' });
+    res.status(500).json({ message: error.message });
   }
 });
 
-// 📌 Kullanıcı Silme / Pasifleştirme
+// 📌 Kullanıcı pasifleştir (soft delete)
 router.delete('/:id', auth, async (req, res) => {
   try {
-    const userId = req.params.id;
-    
     // Admin kontrolü
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+      return res.status(403).json({ message: 'Bu işlem için admin yetkisi gereklidir' });
     }
 
-    const user = await User.findById(userId);
-    
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
     }
@@ -145,25 +153,22 @@ router.delete('/:id', auth, async (req, res) => {
     await user.save();
     
     console.log('✅ Kullanıcı pasifleştirildi:', user.username);
-    res.json({ message: 'Kullanıcı başarıyla silindi (pasif hale getirildi)' });
-
+    res.json({ message: 'Kullanıcı başarıyla pasifleştirildi' });
   } catch (error) {
     console.error('❌ Kullanıcı silinirken hata:', error);
-    res.status(500).json({ message: error.message || 'Kullanıcı silinirken bir hata oluştu.' });
+    res.status(500).json({ message: error.message });
   }
 });
 
-// 📌 Kullanıcıyı aktifleştir
+// 📌 Kullanıcı aktifleştir
 router.put('/:id/activate', auth, async (req, res) => {
   try {
-    const userId = req.params.id;
-    
     // Admin kontrolü
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+      return res.status(403).json({ message: 'Bu işlem için admin yetkisi gereklidir' });
     }
 
-    const user = await User.findById(userId);
+    const user = await User.findById(req.params.id);
     if (!user) {
       return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
     }
@@ -172,10 +177,33 @@ router.put('/:id/activate', auth, async (req, res) => {
     await user.save();
     
     console.log('✅ Kullanıcı aktifleştirildi:', user.username);
-    res.json({ message: 'Kullanıcı başarıyla aktifleştirildi', user });
-
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    
+    res.json({ 
+      message: 'Kullanıcı başarıyla aktifleştirildi',
+      user: userResponse
+    });
   } catch (error) {
     console.error('❌ Kullanıcı aktifleştirilemedi:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 📌 Kullanıcı sayısını getir
+router.get('/count', auth, async (req, res) => {
+  try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Bu işlem için admin yetkisi gereklidir' });
+    }
+
+    const total = await User.countDocuments();
+    const active = await User.countDocuments({ isActive: true });
+    const inactive = await User.countDocuments({ isActive: false });
+    
+    res.json({ total, active, inactive });
+  } catch (error) {
+    console.error('❌ Kullanıcı sayısı getirilemedi:', error);
     res.status(500).json({ message: error.message });
   }
 });

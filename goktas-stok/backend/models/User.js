@@ -1,3 +1,4 @@
+// backend/models/User.js
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
@@ -12,47 +13,68 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  role: {
+  name: {
     type: String,
-    enum: ['admin', 'branch_manager', 'production_manager', 'viewer'], // 'production_manager' eklendi
     required: true
   },
+  
+  // ✅ ANA ROL
+  role: {
+    type: String,
+    enum: ['admin', 'branch_manager', 'production_manager', 'viewer'],
+    required: true
+  },
+  
+  // ✅ ŞUBE YETKİSİ
   branch: {
     type: String,
     enum: ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka', null],
     default: null
   },
-  // Üretim yetkisi için yeni alan
+  
+  // ✅ ÜRETİM YETKİSİ (production_manager için)
   productionRole: {
     type: String,
-    enum: ['planlama', 'uretim', 'paketleme', 'hazir', null],
-    default: null,
-    description: 'Hangi üretim aşamasında yetkili olduğunu belirtir'
+    enum: ['planlama', 'uretim', 'paketleme', 'depo_hazirlik', 'sevk', null],
+    default: null
   },
-  name: {
-    type: String,
-    required: true
+  
+  // ✅ MALZEME DEPO YETKİSİ (YENİ)
+  materialDepoAccess: {
+    type: Boolean,
+    default: false
   },
+  
   isActive: {
     type: Boolean,
     default: true
-  },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  }
+}, { 
+  timestamps: true 
+});
+
+// ✅ Şifre hashleme - DÜZELTİLDİ
+userSchema.pre('save', async function(next) {
+  try {
+    if (!this.isModified('password')) {
+      return next();
+    }
+    const salt = await bcrypt.genSalt(10);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (error) {
+    next(error);
   }
 });
 
-// Şifre hashleme
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
-});
-
-// Şifre karşılaştırma
+// ✅ Şifre karşılaştırma - DÜZELTİLDİ
 userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
+  try {
+    return await bcrypt.compare(candidatePassword, this.password);
+  } catch (error) {
+    throw error;
+  }
 };
 
+// ✅ MODULE EXPORTS - DÜZELTİLDİ
 module.exports = mongoose.model('User', userSchema);
