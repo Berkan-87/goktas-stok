@@ -4,24 +4,18 @@ const router = express.Router();
 const Material = require('../models/Material');
 const auth = require('../middleware/auth');
 
-// 📌 Tüm malzemeleri getir (şubeye göre)
+// 📌 Tüm malzemeleri getir
 router.get('/', auth, async (req, res) => {
   try {
     const { branch } = req.query;
     const filter = { isActive: true };
     if (branch) filter.branch = branch;
     
-    const materials = await Material.find(filter)
-      .sort({ category: 1, name: 1 });
-    
-    console.log(`📦 ${materials.length} malzeme gönderildi`);
+    const materials = await Material.find(filter).sort({ category: 1, name: 1 });
     res.json(materials);
   } catch (error) {
     console.error('❌ Malzemeler getirilemedi:', error);
-    res.status(500).json({ 
-      message: 'Malzemeler getirilirken bir hata oluştu',
-      error: error.message 
-    });
+    res.status(500).json({ message: error.message });
   }
 });
 
@@ -30,85 +24,54 @@ router.get('/category/:category', auth, async (req, res) => {
   try {
     const { category } = req.params;
     const { branch } = req.query;
-    
-    // Kategori kontrolü
-    const validCategories = ['mdf', 'glue', 'edgeband', 'pvc'];
-    if (!validCategories.includes(category)) {
-      return res.status(400).json({ 
-        message: `Geçersiz kategori. Geçerli kategoriler: ${validCategories.join(', ')}` 
-      });
-    }
-    
     const filter = { category, isActive: true };
     if (branch) filter.branch = branch;
     
-    const materials = await Material.find(filter)
-      .sort({ name: 1 });
-    
+    const materials = await Material.find(filter).sort({ name: 1 });
     res.json(materials);
   } catch (error) {
     console.error('❌ Kategori malzemeleri getirilemedi:', error);
-    res.status(500).json({ 
-      message: 'Malzemeler getirilirken bir hata oluştu',
-      error: error.message 
-    });
+    res.status(500).json({ message: error.message });
   }
 });
 
 // 📌 Yeni malzeme ekle
 router.post('/', auth, async (req, res) => {
   try {
-    // Admin kontrolü
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ 
-        message: 'Bu işlem için admin yetkisi gereklidir' 
-      });
+      return res.status(403).json({ message: 'Bu işlem için admin yetkisi gereklidir' });
     }
 
-    console.log('📦 Gelen malzeme verisi:', req.body);
+    console.log('📦 Gelen malzeme:', req.body);
 
     const { category, glueType, color, name, branch } = req.body;
 
-    // ✅ 1. Temel validasyonlar
+    // Validasyonlar
     if (!name || name.trim() === '') {
-      return res.status(400).json({ 
-        message: 'Malzeme adı zorunludur' 
-      });
+      return res.status(400).json({ message: 'Malzeme adı zorunludur' });
     }
 
-    if (!category) {
-      return res.status(400).json({ 
-        message: 'Kategori seçimi zorunludur' 
-      });
-    }
-
-    // ✅ 2. Kategoriye özel validasyonlar
     if (category === 'glue' && !glueType) {
-      return res.status(400).json({ 
-        message: 'Tutkal tipi seçimi zorunludur' 
-      });
+      return res.status(400).json({ message: 'Tutkal tipi seçimi zorunludur' });
     }
 
     if ((category === 'edgeband' || category === 'pvc') && !color) {
-      return res.status(400).json({ 
-        message: 'Renk seçimi zorunludur' 
-      });
+      return res.status(400).json({ message: 'Renk seçimi zorunludur' });
     }
 
-    // ✅ 3. Benzersizlik kontrolü
-    const existingMaterial = await Material.findOne({ 
+    // Benzersizlik kontrolü
+    const existing = await Material.findOne({ 
       name: name.trim(), 
       category, 
       branch: branch || 'fabrika' 
     });
 
-    if (existingMaterial) {
+    if (existing) {
       return res.status(400).json({ 
         message: `"${name}" isimli malzeme bu kategoride ve şubede zaten mevcut` 
       });
     }
 
-    // ✅ 4. Malzemeyi oluştur
     const material = new Material({
       name: name.trim(),
       category,
@@ -136,7 +99,6 @@ router.post('/', auth, async (req, res) => {
   } catch (error) {
     console.error('❌ Malzeme eklenirken hata:', error);
     
-    // ✅ Detaylı hata mesajları
     if (error.code === 11000) {
       return res.status(400).json({ 
         message: 'Bu malzeme zaten mevcut (Aynı isim, kategori ve şube ile kayıtlı)' 
@@ -161,13 +123,8 @@ router.put('/:id/stock', auth, async (req, res) => {
   try {
     const { quantity } = req.body;
     
-    // Validasyon
-    if (quantity === undefined || quantity === null) {
-      return res.status(400).json({ message: 'Miktar bilgisi gönderilmedi' });
-    }
-
-    if (quantity === 0) {
-      return res.status(400).json({ message: 'Miktar 0 olamaz' });
+    if (!quantity || quantity === 0) {
+      return res.status(400).json({ message: 'Geçerli bir miktar giriniz' });
     }
 
     const material = await Material.findById(req.params.id);
@@ -185,7 +142,6 @@ router.put('/:id/stock', auth, async (req, res) => {
     material.stock = newStock;
     await material.save();
     
-    console.log(`✅ Stok güncellendi: ${material.name} → ${material.stock}`);
     res.json({
       success: true,
       message: 'Stok başarıyla güncellendi',
@@ -193,20 +149,15 @@ router.put('/:id/stock', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Stok güncellenirken hata:', error);
-    res.status(400).json({ 
-      message: error.message || 'Stok güncellenirken bir hata oluştu' 
-    });
+    res.status(400).json({ message: error.message });
   }
 });
 
 // 📌 Malzeme güncelle
 router.put('/:id', auth, async (req, res) => {
   try {
-    // Admin kontrolü
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ 
-        message: 'Bu işlem için admin yetkisi gereklidir' 
-      });
+      return res.status(403).json({ message: 'Bu işlem için admin yetkisi gereklidir' });
     }
 
     const material = await Material.findById(req.params.id);
@@ -214,10 +165,8 @@ router.put('/:id', auth, async (req, res) => {
       return res.status(404).json({ message: 'Malzeme bulunamadı' });
     }
 
-    // Güncelleme verilerini hazırla
     const updateData = { ...req.body };
     
-    // Kategori değiştiyse özel alanları temizle
     if (updateData.category && updateData.category !== material.category) {
       if (updateData.category !== 'mdf') {
         updateData.thickness = null;
@@ -232,41 +181,28 @@ router.put('/:id', auth, async (req, res) => {
       }
     }
 
-    const updatedMaterial = await Material.findByIdAndUpdate(
+    const updated = await Material.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
     );
 
-    console.log('✅ Malzeme güncellendi:', updatedMaterial.name);
     res.json({
       success: true,
       message: 'Malzeme başarıyla güncellendi',
-      material: updatedMaterial
+      material: updated
     });
   } catch (error) {
     console.error('❌ Malzeme güncellenirken hata:', error);
-    
-    if (error.code === 11000) {
-      return res.status(400).json({ 
-        message: 'Bu isimde bir malzeme zaten mevcut' 
-      });
-    }
-    
-    res.status(400).json({ 
-      message: error.message || 'Malzeme güncellenirken bir hata oluştu' 
-    });
+    res.status(400).json({ message: error.message });
   }
 });
 
 // 📌 Malzeme sil (soft delete)
 router.delete('/:id', auth, async (req, res) => {
   try {
-    // Admin kontrolü
     if (req.user.role !== 'admin') {
-      return res.status(403).json({ 
-        message: 'Bu işlem için admin yetkisi gereklidir' 
-      });
+      return res.status(403).json({ message: 'Bu işlem için admin yetkisi gereklidir' });
     }
 
     const material = await Material.findById(req.params.id);
@@ -277,7 +213,6 @@ router.delete('/:id', auth, async (req, res) => {
     material.isActive = false;
     await material.save();
 
-    console.log('🗑️ Malzeme silindi:', material.name);
     res.json({
       success: true,
       message: `"${material.name}" malzemesi başarıyla silindi`,
@@ -285,13 +220,11 @@ router.delete('/:id', auth, async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Malzeme silinirken hata:', error);
-    res.status(500).json({ 
-      message: error.message || 'Malzeme silinirken bir hata oluştu' 
-    });
+    res.status(500).json({ message: error.message });
   }
 });
 
-// 📌 Toplam malzeme istatistikleri
+// 📌 İstatistikler
 router.get('/stats', auth, async (req, res) => {
   try {
     const { branch } = req.query;
@@ -321,9 +254,7 @@ router.get('/stats', auth, async (req, res) => {
     res.json(stats);
   } catch (error) {
     console.error('❌ İstatistikler getirilemedi:', error);
-    res.status(500).json({ 
-      message: 'İstatistikler getirilirken bir hata oluştu' 
-    });
+    res.status(500).json({ message: error.message });
   }
 });
 

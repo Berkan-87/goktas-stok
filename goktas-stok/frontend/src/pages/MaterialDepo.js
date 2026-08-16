@@ -20,7 +20,6 @@ const MaterialDepo = () => {
   
   const [newMaterial, setNewMaterial] = useState({
     name: '',
-    category: 'mdf',
     unit: 'adet',
     thickness: '',
     size: '',
@@ -82,11 +81,9 @@ const MaterialDepo = () => {
     return materials.filter(m => m.category === category);
   };
 
-  // ✅ handleAddMaterial - DÜZELTİLDİ
   const handleAddMaterial = async (e) => {
     e.preventDefault();
     
-    // Validasyonlar
     if (!newMaterial.name.trim()) {
       toast.error('Malzeme adı zorunludur');
       return;
@@ -103,7 +100,6 @@ const MaterialDepo = () => {
     }
 
     try {
-      // ✅ Kategoriye göre payload hazırla
       const payload = {
         name: newMaterial.name.trim(),
         category: activeTab,
@@ -113,7 +109,7 @@ const MaterialDepo = () => {
         unit: newMaterial.unit || 'adet'
       };
 
-      // ✅ Sadece ilgili kategoriye özel alanları ekle
+      // Kategoriye özel alanlar
       if (activeTab === 'mdf') {
         payload.thickness = newMaterial.thickness || null;
         payload.size = newMaterial.size || null;
@@ -127,16 +123,12 @@ const MaterialDepo = () => {
       console.log('📦 Gönderilen payload:', payload);
 
       const response = await axios.post('/materials', payload);
-      console.log('✅ Başarılı:', response.data);
-      
       toast.success('✅ Malzeme başarıyla eklendi');
       setShowAddModal(false);
       resetForm();
       fetchMaterials();
     } catch (error) {
       console.error('❌ Ekleme hatası:', error);
-      console.error('❌ Hata detayı:', error.response?.data);
-      
       const errorMessage = error.response?.data?.message || 'Ekleme başarısız';
       toast.error(errorMessage);
     }
@@ -145,7 +137,6 @@ const MaterialDepo = () => {
   const resetForm = () => {
     setNewMaterial({
       name: '',
-      category: 'mdf',
       unit: 'adet',
       thickness: '',
       size: '',
@@ -180,7 +171,6 @@ const MaterialDepo = () => {
     return '🟢 Yeterli';
   };
 
-  // Render Form - DÜZELTİLDİ
   const renderAddForm = () => {
     switch (activeTab) {
       case 'mdf':
@@ -317,7 +307,6 @@ const MaterialDepo = () => {
     }
   };
 
-  // Malzeme kartı render
   const renderMaterialCard = (material) => {
     const statusColor = getStatusColor(material.stock, material.criticalLevel);
     const statusText = getStatusText(material.stock, material.criticalLevel);
@@ -405,7 +394,6 @@ const MaterialDepo = () => {
 
   return (
     <div className="space-y-6">
-      {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">📦 Malzeme Depo</h1>
@@ -431,7 +419,6 @@ const MaterialDepo = () => {
         </div>
       </div>
 
-      {/* Sekmeler */}
       <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
         {tabs.map(tab => (
           <button
@@ -451,7 +438,6 @@ const MaterialDepo = () => {
         ))}
       </div>
 
-      {/* Malzeme Listesi */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         {getCategoryMaterials(activeTab).length === 0 ? (
           <div className="col-span-full text-center py-12 bg-white rounded-xl shadow">
@@ -463,7 +449,6 @@ const MaterialDepo = () => {
         )}
       </div>
 
-      {/* Yeni Malzeme Ekleme Modalı */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">

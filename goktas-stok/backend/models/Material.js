@@ -25,14 +25,13 @@ const materialSchema = new mongoose.Schema({
   thickness: { type: Number, default: null },
   size: { type: String, trim: true, default: null },
   
-  // ✅ Tutkal - DÜZELTİLDİ
+  // Tutkal
   glueType: {
     type: String,
     enum: ['iskelet', 'laminasyon', 'kenar_bant'],
     default: null,
     validate: {
       validator: function(value) {
-        // Sadece glue kategorisi için zorunlu
         if (this.category === 'glue') {
           return value !== null && value !== undefined && value !== '';
         }
@@ -72,30 +71,22 @@ const materialSchema = new mongoose.Schema({
 // ✅ Benzersiz indeks
 materialSchema.index({ category: 1, name: 1, branch: 1 }, { unique: true });
 
-// ✅ Pre-save middleware - Kategoriye göre gereksiz alanları temizle
+// ✅ Pre-save middleware
 materialSchema.pre('save', function(next) {
-  // MDF değilse thickness ve size'ı temizle
   if (this.category !== 'mdf') {
     this.thickness = null;
     this.size = null;
   }
-  
-  // Tutkal değilse glueType'ı temizle
   if (this.category !== 'glue') {
     this.glueType = null;
   }
-  
-  // Kenar Bant veya PVC değilse renk alanlarını temizle
   if (this.category !== 'edgeband' && this.category !== 'pvc') {
     this.color = null;
     this.colorName = null;
   }
-  
-  // Tutkal ise glueType kontrol et
   if (this.category === 'glue' && !this.glueType) {
     return next(new Error('Tutkal tipi seçimi zorunludur'));
   }
-  
   next();
 });
 
