@@ -28,6 +28,7 @@ const Chat = () => {
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
   const [activeChats, setActiveChats] = useState([]);
+  const [unreadCounts, setUnreadCounts] = useState({});
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const messagesContainerRef = useRef(null);
@@ -117,7 +118,6 @@ const Chat = () => {
       setUsers(filteredUsers);
       setGroups(groupsRes.data);
       
-      // ✅ Sohbet listesini oluştur
       const chats = [];
       chats.push({ id: 'general', type: 'general', name: '💬 Genel Sohbet', icon: '💬' });
       
@@ -156,7 +156,7 @@ const Chat = () => {
   const fetchGeneralMessages = async () => {
     try {
       const response = await axios.get('/messages/general');
-      const newMessages = response.data;
+      const newMessages = response.data || [];
       
       if (!isFirstLoad.current && messages.length > 0) {
         const oldIds = new Set(messages.map(m => m._id));
@@ -165,7 +165,6 @@ const Chat = () => {
           console.log('🔔 Yeni mesaj geldi:', newMsg);
           showNotification(newMsg);
           playSound();
-          // ✅ Sohbet listesini yeniden sırala
           reorderChats();
         }
       }
@@ -185,7 +184,7 @@ const Chat = () => {
   const fetchPrivateMessages = async (userId) => {
     try {
       const response = await axios.get(`/messages/private/${userId}`);
-      const newMessages = response.data;
+      const newMessages = response.data || [];
       
       if (!isFirstLoad.current && messages.length > 0) {
         const oldIds = new Set(messages.map(m => m._id));
@@ -214,7 +213,7 @@ const Chat = () => {
   const fetchGroupMessages = async (groupId) => {
     try {
       const response = await axios.get(`/messages/group/${groupId}`);
-      const newMessages = response.data;
+      const newMessages = response.data || [];
       
       if (!isFirstLoad.current && messages.length > 0) {
         const oldIds = new Set(messages.map(m => m._id));
@@ -242,34 +241,40 @@ const Chat = () => {
   // ✅ Sohbet listesini en son mesaja göre sırala (WhatsApp tarzı)
   const reorderChats = () => {
     setActiveChats(prev => {
-      // Önce genel sohbeti sabit tut
-      const generalChat = prev.find(c => c.id === 'general');
-      const otherChats = prev.filter(c => c.id !== 'general');
+      if (!prev || prev.length === 0) return prev;
       
-      // Her sohbet için en son mesaj tarihini bul
+      const generalChat = prev.find(c => c && c.id === 'general');
+      const otherChats = prev.filter(c => c && c.id !== 'general');
+      
       const sortedChats = otherChats.sort((a, b) => {
         const lastMsgA = getLastMessageTime(a.id);
         const lastMsgB = getLastMessageTime(b.id);
         return lastMsgB - lastMsgA;
       });
       
-      return [generalChat, ...sortedChats];
+      return generalChat ? [generalChat, ...sortedChats] : sortedChats;
     });
   };
 
   // ✅ Bir sohbetin en son mesaj zamanını bul
   const getLastMessageTime = (chatId) => {
-    if (chatType === 'general') {
-      const msg = messages.find(m => !m.receiver && !m.group);
-      return msg ? new Date(msg.createdAt).getTime() : 0;
-    } else if (chatType === 'private') {
-      const msg = messages.find(m => 
-        (m.sender?._id === chatId || m.receiver === chatId) && !m.group
-      );
-      return msg ? new Date(msg.createdAt).getTime() : 0;
-    } else if (chatType === 'group') {
-      const msg = messages.find(m => m.group === chatId);
-      return msg ? new Date(msg.createdAt).getTime() : 0;
+    if (!messages || messages.length === 0) return 0;
+    
+    try {
+      if (chatType === 'general') {
+        const msg = messages.find(m => !m.receiver && !m.group);
+        return msg ? new Date(msg.createdAt).getTime() : 0;
+      } else if (chatType === 'private') {
+        const msg = messages.find(m => 
+          (m.sender?._id === chatId || m.receiver === chatId) && !m.group
+        );
+        return msg ? new Date(msg.createdAt).getTime() : 0;
+      } else if (chatType === 'group') {
+        const msg = messages.find(m => m.group === chatId);
+        return msg ? new Date(msg.createdAt).getTime() : 0;
+      }
+    } catch (error) {
+      console.error('getLastMessageTime hatası:', error);
     }
     return 0;
   };
@@ -320,8 +325,12 @@ const Chat = () => {
 
   // ✅ Okunmamış sayılarını güncelle
   const updateUnreadCounts = () => {
+    if (!activeChats || activeChats.length === 0) return;
+    
     const counts = {};
     activeChats.forEach(chat => {
+      if (!chat) return;
+      
       if (chat.type === 'general') {
         counts[chat.id] = messages.filter(m => 
           !m.readBy?.includes(user._id) && 
@@ -398,28 +407,36 @@ const Chat = () => {
 
   // ✅ Okunmamış mesaj kontrolü
   const isUnread = (message) => {
-    if (!message.readBy) return true;
+    if (!message || !message.readBy) return true;
     return !message.readBy.includes(user._id) && message.sender?._id !== user._id;
   };
 
   // ✅ Okunmamış mesaj sayısını al
   const getUnreadCount = (chatId) => {
+    if (!unreadCounts) return 0;
     return unreadCounts[chatId] || 0;
   };
 
   // ✅ Sohbet listesinde en son mesajı bul
   const getLastMessage = (chatId) => {
-    let lastMsg = null;
-    if (chatType === 'general') {
-      lastMsg = messages.find(m => !m.receiver && !m.group);
-    } else if (chatType === 'private') {
-      lastMsg = messages.find(m => 
-        (m.sender?._id === chatId || m.receiver === chatId) && !m.group
-      );
-    } else if (chatType === 'group') {
-      lastMsg = messages.find(m => m.group === chatId);
+    if (!messages || messages.length === 0) return null;
+    
+    try {
+      let lastMsg = null;
+      if (chatType === 'general') {
+        lastMsg = messages.find(m => !m.receiver && !m.group);
+      } else if (chatType === 'private') {
+        lastMsg = messages.find(m => 
+          (m.sender?._id === chatId || m.receiver === chatId) && !m.group
+        );
+      } else if (chatType === 'group') {
+        lastMsg = messages.find(m => m.group === chatId);
+      }
+      return lastMsg;
+    } catch (error) {
+      console.error('getLastMessage hatası:', error);
+      return null;
     }
-    return lastMsg;
   };
 
   useEffect(() => {
@@ -440,17 +457,34 @@ const Chat = () => {
     return () => clearInterval(interval);
   }, [chatType, selectedUser, selectedGroup]);
 
-  // ✅ Arama filtresi
-  const filteredChats = activeChats.filter(chat => 
-    chat.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // ✅ Arama filtresi - Güvenli
+  const filteredChats = (activeChats && activeChats.length > 0) 
+    ? activeChats.filter(chat => 
+        chat && chat.name && chat.name.toLowerCase().includes(searchTerm.toLowerCase())
+      ) 
+    : [];
 
   // ✅ Mesaja tıklandığında okundu işaretle
   const handleMessageClick = (message) => {
-    if (isUnread(message)) {
+    if (message && isUnread(message)) {
       markMessageAsRead(message._id);
     }
   };
+
+  // ✅ Sohbet listesini sıralı göster - Güvenli
+  const sortedChats = (filteredChats && filteredChats.length > 0) 
+    ? [...filteredChats].sort((a, b) => {
+        if (!a || !b) return 0;
+        if (a.id === 'general') return -1;
+        if (b.id === 'general') return 1;
+        
+        const lastA = getLastMessage(a.id);
+        const lastB = getLastMessage(b.id);
+        const timeA = lastA ? new Date(lastA.createdAt).getTime() : 0;
+        const timeB = lastB ? new Date(lastB.createdAt).getTime() : 0;
+        return timeB - timeA;
+      })
+    : [];
 
   if (loading && messages.length === 0) {
     return (
@@ -479,19 +513,6 @@ const Chat = () => {
 
   // ✅ Toplam okunmamış mesaj sayısı
   const totalUnread = messages.filter(m => isUnread(m)).length;
-
-  // ✅ Sohbet listesini sıralı göster (en son mesaj en üstte)
-  const sortedChats = [...filteredChats].sort((a, b) => {
-    // Genel sohbet her zaman en üstte
-    if (a.id === 'general') return -1;
-    if (b.id === 'general') return 1;
-    
-    const lastA = getLastMessage(a.id);
-    const lastB = getLastMessage(b.id);
-    const timeA = lastA ? new Date(lastA.createdAt).getTime() : 0;
-    const timeB = lastB ? new Date(lastB.createdAt).getTime() : 0;
-    return timeB - timeA;
-  });
 
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] bg-gray-50 rounded-xl shadow-lg overflow-hidden">
@@ -550,50 +571,57 @@ const Chat = () => {
             </div>
 
             {/* ✅ Sohbet listesi - En son mesaja göre sıralı */}
-            {sortedChats.map((chat) => {
-              const unread = getUnreadCount(chat.id);
-              const lastMsg = getLastMessage(chat.id);
-              const lastMsgTime = lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
-              
-              return (
-                <button
-                  key={chat.id}
-                  onClick={() => changeChat(chat)}
-                  className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between border-l-4 ${
-                    (chatType === 'general' && chat.type === 'general') ||
-                    (chatType === 'private' && chat.type === 'private' && selectedUser === chat.id) ||
-                    (chatType === 'group' && chat.type === 'group' && selectedGroup === chat.id)
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <span className="text-2xl flex-shrink-0">{chat.icon}</span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className={`text-sm font-medium truncate ${unread > 0 ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
-                          {chat.name}
-                        </span>
-                        {unread > 0 && (
-                          <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
-                            {unread}
+            {sortedChats.length > 0 ? (
+              sortedChats.map((chat) => {
+                if (!chat) return null;
+                const unread = getUnreadCount(chat.id);
+                const lastMsg = getLastMessage(chat.id);
+                const lastMsgTime = lastMsg ? new Date(lastMsg.createdAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }) : '';
+                
+                return (
+                  <button
+                    key={chat.id}
+                    onClick={() => changeChat(chat)}
+                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-center justify-between border-l-4 ${
+                      (chatType === 'general' && chat.type === 'general') ||
+                      (chatType === 'private' && chat.type === 'private' && selectedUser === chat.id) ||
+                      (chatType === 'group' && chat.type === 'group' && selectedGroup === chat.id)
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <span className="text-2xl flex-shrink-0">{chat.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className={`text-sm font-medium truncate ${unread > 0 ? 'font-bold text-gray-900' : 'text-gray-700'}`}>
+                            {chat.name}
                           </span>
+                          {unread > 0 && (
+                            <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0">
+                              {unread}
+                            </span>
+                          )}
+                        </div>
+                        {lastMsg && (
+                          <div className="flex items-center gap-2">
+                            <span className={`text-xs truncate ${unread > 0 ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
+                              {lastMsg.sender?.name === user?.name ? 'Sen: ' : ''}
+                              {lastMsg.content?.length > 30 ? lastMsg.content.substring(0, 30) + '...' : lastMsg.content}
+                            </span>
+                            <span className="text-xs text-gray-400 flex-shrink-0">{lastMsgTime}</span>
+                          </div>
                         )}
                       </div>
-                      {lastMsg && (
-                        <div className="flex items-center gap-2">
-                          <span className={`text-xs truncate ${unread > 0 ? 'text-gray-900 font-medium' : 'text-gray-400'}`}>
-                            {lastMsg.sender?.name === user?.name ? 'Sen: ' : ''}
-                            {lastMsg.content?.length > 30 ? lastMsg.content.substring(0, 30) + '...' : lastMsg.content}
-                          </span>
-                          <span className="text-xs text-gray-400 flex-shrink-0">{lastMsgTime}</span>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                </button>
-              );
-            })}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="p-4 text-center text-gray-400 text-sm">
+                {searchTerm ? 'Kullanıcı bulunamadı' : 'Henüz sohbet yok'}
+              </div>
+            )}
 
             <div className="p-3 border-t border-gray-100 bg-gray-50">
               <p className="text-xs text-gray-500 text-center">👥 {users.length} kullanıcı ile sohbet edebilirsin</p>
@@ -662,6 +690,7 @@ const Chat = () => {
               </div>
             ) : (
               messages.map((message) => {
+                if (!message) return null;
                 const isOwn = message.sender?._id === user._id;
                 const unread = isUnread(message);
                 
@@ -676,8 +705,8 @@ const Chat = () => {
                         isOwn
                           ? 'bg-blue-500 text-white'
                           : unread
-                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400' // ✅ OKUNMAMIŞ - KOYU RENK
-                          : 'bg-white text-gray-900 border border-gray-200 hover:shadow-md' // ✅ OKUNDU - AÇIK RENK
+                          ? 'bg-gray-800 text-white shadow-lg ring-2 ring-yellow-400'
+                          : 'bg-white text-gray-900 border border-gray-200 hover:shadow-md'
                       }`}
                     >
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
