@@ -10,7 +10,10 @@ import {
   CheckIcon,
   XMarkIcon,
   ArrowPathIcon,
-  DocumentArrowDownIcon
+  DocumentArrowDownIcon,
+  UserIcon,
+  CalendarIcon,
+  CubeIcon
 } from '@heroicons/react/24/outline';
 
 const Transfer = () => {
@@ -33,7 +36,6 @@ const Transfer = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
 
-  // ✅ Kısmi Karşılama Modal State
   const [partialModal, setPartialModal] = useState({
     show: false,
     transferId: null,
@@ -42,6 +44,13 @@ const Transfer = () => {
     partialQuantity: '',
     partialNote: ''
   });
+
+  const colors = [
+    { id: 'bute_beyaz', label: 'Bute Beyaz', color: '#f3f4f6', textColor: '#1f2937', emoji: '⚪' },
+    { id: 'koyu_gri', label: 'Koyu Gri', color: '#4b5563', textColor: '#ffffff', emoji: '⚫' },
+    { id: 'acik_gri', label: 'Açık Gri', color: '#e5e7eb', textColor: '#1f2937', emoji: '🔘' },
+    { id: 'tas_gri', label: 'Taş Gri', color: '#6b7280', textColor: '#ffffff', emoji: '🪨' }
+  ];
 
   const branches = [
     { value: 'fabrika', label: '🏭 Fabrika' },
@@ -206,7 +215,6 @@ const Transfer = () => {
     }
   };
 
-  // ✅ Kısmi Karşılama İşlemi
   const handlePartialFulfill = async (e) => {
     e.preventDefault();
     
@@ -318,6 +326,13 @@ const Transfer = () => {
     if (!productId || !products || products.length === 0) return 'Ürün bulunamadı';
     const product = products.find(p => p._id === productId);
     return product ? product.name : 'Ürün bulunamadı';
+  };
+
+  const getCategoryEmoji = (category) => {
+    if (category === 'kanat') return '🚪';
+    if (category === 'kasa') return '🪟';
+    if (category === 'baslik') return '🎯';
+    return '📦';
   };
 
   if (loading) {
@@ -477,8 +492,7 @@ const Transfer = () => {
                     return (
                       <option key={product._id} value={product._id}>
                         {product.name}
-                        {product.category === 'kanat' ? ' 🚪' :
-                          product.category === 'kasa' ? ' 🪟' : ' 🎯'}
+                        {getCategoryEmoji(product.category)}
                         {' - '}Fabrika: {stock} adet
                         {stock === 0 && ' ⚠️ Stok yok'}
                       </option>
@@ -587,64 +601,155 @@ const Transfer = () => {
         </div>
       )}
 
-      {/* Bekleyen Talepler (Fabrika) */}
+      {/* Bekleyen Talepler (Fabrika) - PROFESYONEL TASARIM */}
       {activeTab === 'pending' && isFabrika && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {pendingTransfers.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl shadow">
-              <p className="text-lg text-gray-500">📭 Bekleyen transfer talebi yok</p>
+            <div className="text-center py-16 bg-white rounded-2xl shadow-sm border border-gray-100">
+              <div className="text-6xl mb-4">📭</div>
+              <p className="text-xl text-gray-500 font-medium">Bekleyen transfer talebi yok</p>
               <p className="text-sm text-gray-400 mt-1">Tüm talepler işleme alınmış görünüyor</p>
             </div>
           ) : (
-            pendingTransfers.map((transfer) => (
-              <div key={transfer._id} className="bg-white rounded-xl shadow-lg border border-yellow-200 p-4 hover:shadow-xl transition-shadow">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-lg font-bold text-gray-900">
-                        {transfer.productId?.name || 'Ürün bulunamadı'}
-                      </span>
-                      <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-medium">
-                        ⏳ Beklemede
+            // ✅ Şube bazlı gruplama
+            Object.entries(
+              pendingTransfers.reduce((acc, transfer) => {
+                const branch = transfer.targetBranch;
+                if (!acc[branch]) acc[branch] = [];
+                acc[branch].push(transfer);
+                return acc;
+              }, {})
+            ).map(([branch, branchTransfers]) => {
+              const branchLabel = branches.find(b => b.value === branch)?.label || branch;
+              const totalItems = branchTransfers.length;
+              const totalQuantity = branchTransfers.reduce((sum, t) => sum + t.quantity, 0);
+              
+              return (
+                <div key={branch} className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden hover:shadow-xl transition-shadow duration-300">
+                  {/* Şube Başlığı */}
+                  <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">🏢</span>
+                      <div>
+                        <h3 className="text-lg font-bold text-white">{branchLabel}</h3>
+                        <p className="text-blue-100 text-sm">
+                          {totalItems} talep • Toplam: {totalQuantity} adet
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-white/20 text-white px-3 py-1 rounded-full text-xs font-medium backdrop-blur-sm">
+                        ⏳ {totalItems} bekleyen
                       </span>
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-gray-600">
-                      <div>
-                        <span className="font-medium">Talep Eden:</span> {transfer.requestedBy?.name || 'Bilinmiyor'}
-                      </div>
-                      <div>
-                        <span className="font-medium">Hedef Şube:</span> {branches.find(b => b.value === transfer.targetBranch)?.label}
-                      </div>
-                      <div>
-                        <span className="font-medium">Miktar:</span> {transfer.quantity} adet
-                      </div>
-                      <div>
-                        <span className="font-medium">Tarih:</span> {new Date(transfer.createdAt).toLocaleString('tr-TR')}
-                      </div>
-                    </div>
-                    {transfer.note && (
-                      <p className="text-sm text-gray-500 mt-2">📝 {transfer.note}</p>
-                    )}
                   </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleApprove(transfer._id)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1 text-sm"
-                    >
-                      <CheckIcon className="h-4 w-4" />
-                      Onayla
-                    </button>
-                    <button
-                      onClick={() => handleReject(transfer._id)}
-                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-1 text-sm"
-                    >
-                      <XMarkIcon className="h-4 w-4" />
-                      Reddet
-                    </button>
+
+                  {/* Talep Listesi */}
+                  <div className="divide-y divide-gray-100">
+                    {branchTransfers.map((transfer) => {
+                      const product = transfer.productId;
+                      const colorInfo = product?.color ? colors.find(c => c.id === product.color) : null;
+                      const isPartial = transfer.partialQuantity && transfer.partialQuantity < transfer.quantity;
+                      
+                      return (
+                        <div key={transfer._id} className="p-4 hover:bg-gray-50 transition-colors">
+                          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                            {/* Ürün Bilgisi */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-base font-semibold text-gray-900">
+                                  {product?.name || 'Ürün bulunamadı'}
+                                </span>
+                                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {getCategoryEmoji(product?.category)}
+                                  {product?.category === 'kanat' ? 'Kanat' : 
+                                   product?.category === 'kasa' ? 'Kasa' : 
+                                   product?.category === 'baslik' ? 'Başlık' : ''}
+                                </span>
+                                {colorInfo && (
+                                  <span 
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border"
+                                    style={{
+                                      backgroundColor: colorInfo.color,
+                                      color: colorInfo.textColor,
+                                      borderColor: product.color === 'acik_gri' ? '#9ca3af' : 'transparent'
+                                    }}
+                                  >
+                                    {colorInfo.emoji} {colorInfo.label}
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Talep Detayları */}
+                              <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <CubeIcon className="h-4 w-4" />
+                                  <span className="font-medium text-gray-700">Miktar:</span>
+                                  <span className="text-gray-900 font-semibold">{transfer.quantity} adet</span>
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <UserIcon className="h-4 w-4" />
+                                  <span className="font-medium text-gray-700">Talep eden:</span>
+                                  {transfer.requestedBy?.name || 'Bilinmiyor'}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <CalendarIcon className="h-4 w-4" />
+                                  <span className="font-medium text-gray-700">Tarih:</span>
+                                  {new Date(transfer.createdAt).toLocaleDateString('tr-TR')}
+                                </span>
+                              </div>
+                              
+                              {transfer.note && (
+                                <p className="mt-1 text-sm text-gray-400 italic">
+                                  📝 {transfer.note}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Aksiyon Butonları */}
+                            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap">
+                              {isPartial && (
+                                <span className="text-xs text-orange-600 bg-orange-50 px-2 py-1 rounded-full font-medium">
+                                  ⚠️ Kısmi (Önceki: {transfer.partialQuantity})
+                                </span>
+                              )}
+                              <button
+                                onClick={() => handleApprove(transfer._id)}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 shadow-sm hover:shadow"
+                              >
+                                <CheckIcon className="h-4 w-4" />
+                                <span>Tümünü Gönder</span>
+                              </button>
+                              <button
+                                onClick={() => setPartialModal({
+                                  show: true,
+                                  transferId: transfer._id,
+                                  productName: product?.name || 'Ürün',
+                                  requestedQuantity: transfer.quantity,
+                                  partialQuantity: '',
+                                  partialNote: ''
+                                })}
+                                className="px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-1.5 shadow-sm hover:shadow"
+                              >
+                                <DocumentArrowDownIcon className="h-4 w-4" />
+                                <span>Kısmi Gönder</span>
+                              </button>
+                              <button
+                                onClick={() => handleReject(transfer._id)}
+                                className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium rounded-lg transition-colors border border-red-200"
+                                title="Reddet"
+                              >
+                                <XMarkIcon className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
@@ -749,7 +854,6 @@ const Transfer = () => {
                           {new Date(transfer.createdAt).toLocaleString('tr-TR')}
                         </span>
                         
-                        {/* ✅ Kısmi Karşılama Butonu - Fabrika için */}
                         {transfer.status === 'approved' && isFabrika && (
                           <button
                             onClick={() => setPartialModal({
@@ -802,7 +906,7 @@ const Transfer = () => {
         </div>
       )}
 
-      {/* ✅ Kısmi Karşılama Modalı */}
+      {/* Kısmi Karşılama Modalı */}
       {partialModal.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
