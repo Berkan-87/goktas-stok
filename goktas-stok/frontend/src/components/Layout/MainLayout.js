@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
-import axios from '../utils/axios';
+import axios from '../../utils/axios'; // ✅ DÜZELTİLDİ
 import {
   HomeIcon,
   CubeIcon,
@@ -83,7 +83,6 @@ const MainLayout = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    // 📌 Dış katmana h-screen ve overflow-hidden vererek içeriğin taşmasını engelledik.
     <div className="flex h-screen w-full bg-gray-100 overflow-hidden relative">
       
       {/* Mobil Menü Butonu */}
@@ -146,7 +145,6 @@ const MainLayout = () => {
                 }`} />
                 <span className="font-medium flex-1">{item.name}</span>
                 
-                {/* ✅ Badge - Okunmamış mesaj sayısı */}
                 {hasBadge && (
                   <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center animate-pulse">
                     {item.badge > 99 ? '99+' : item.badge}
@@ -168,19 +166,13 @@ const MainLayout = () => {
         </div>
       </aside>
 
-      {/* 📌 ANA İÇERİK - flex-1 ve h-full ile kalan tüm alanı doldurur */}
       <main className="flex-1 flex flex-col h-full w-full overflow-hidden relative">
-        
-        {/* Mobilde Sidebar açıldığında üstteki boşluğu dolduran header */}
         <div className="h-16 lg:h-0 shrink-0"></div>
-
-        {/* 📌 İçerik alanı (Outlet) - Fazla padding'i kaldırdık, taşmaları engelledik */}
         <div className="flex-1 overflow-auto p-4 lg:p-6 w-full h-full">
           <Outlet /> 
         </div>
       </main>
 
-      {/* Mobilde kapatma katmanı */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden"
