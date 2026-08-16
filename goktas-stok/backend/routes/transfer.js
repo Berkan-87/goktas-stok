@@ -14,10 +14,12 @@ router.get('/', auth, async (req, res) => {
       .populate('approvedBy', 'name username')
       .populate('completedBy', 'name username')
       .populate('rejectedBy', 'name username')
+      .populate('partialFulfilledBy', 'name username')
       .populate('productId', 'name category color')
       .sort({ createdAt: -1 });
     res.json(transfers);
   } catch (error) {
+    console.error('❌ Transferler getirilemedi:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -36,10 +38,12 @@ router.get('/branch/:branch', auth, async (req, res) => {
       .populate('approvedBy', 'name username')
       .populate('completedBy', 'name username')
       .populate('rejectedBy', 'name username')
+      .populate('partialFulfilledBy', 'name username')
       .populate('productId', 'name category color')
       .sort({ createdAt: -1 });
     res.json(transfers);
   } catch (error) {
+    console.error('❌ Şube transferleri getirilemedi:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -54,13 +58,17 @@ router.post('/', auth, async (req, res) => {
       return res.status(400).json({ message: 'Kaynak ve hedef şube aynı olamaz' });
     }
 
+    if (!quantity || quantity <= 0) {
+      return res.status(400).json({ message: 'Geçerli bir miktar giriniz' });
+    }
+
     // Ürün kontrolü
     const product = await Product.findById(productId);
     if (!product) {
       return res.status(404).json({ message: 'Ürün bulunamadı' });
     }
 
-    // Kaynak şubede stok kontrolü (sadece fabrika için değil, tüm şubeler için)
+    // Kaynak şubede stok kontrolü
     const sourceStock = await Stock.findOne({ productId, branch: sourceBranch });
     if (!sourceStock || sourceStock.quantity < quantity) {
       return res.status(400).json({ 
@@ -75,7 +83,7 @@ router.post('/', auth, async (req, res) => {
       targetBranch,
       productId,
       quantity,
-      note,
+      note: note || '',
       status: 'pending'
     });
 
@@ -85,7 +93,7 @@ router.post('/', auth, async (req, res) => {
 
     res.status(201).json(transfer);
   } catch (error) {
-    console.error('Transfer talebi hatası:', error);
+    console.error('❌ Transfer talebi hatası:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -119,12 +127,11 @@ router.put('/:id/approve', auth, async (req, res) => {
       });
     }
 
-    // Stok işlemleri
-    // 1. Kaynak şubeden düş
+    // Stok işlemleri - Kaynak şubeden düş
     sourceStock.quantity -= transfer.quantity;
     await sourceStock.save();
 
-    // 2. Hedef şubeye ekle (yoksa oluştur)
+    // Hedef şubeye ekle (yoksa oluştur)
     let targetStock = await Stock.findOne({ 
       productId: transfer.productId, 
       branch: transfer.targetBranch 
@@ -156,7 +163,105 @@ router.put('/:id/approve', auth, async (req, res) => {
       transfer 
     });
   } catch (error) {
-    console.error('Transfer onay hatası:', error);
+    console.error('❌ Transfer onay hatası:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 📌 ✅ YENİ: Kısmi karşılama (Fabrika kısmi miktar gönderir)
+router.put('/:id/partial-fulfill', auth, async (req, res) => {
+  try {
+    const { partialQuantity, partialNote } = req.body;
+    const transfer = await Transfer.findById(req.params.id);
+    
+    if (!transfer) {
+      return res.status(404).json({ message: 'Transfer bulunamadı' });
+    }
+
+    // Sadece onaylanmış transferler kısmi karşılanabilir
+    if (transfer.status !== 'approved') {
+      return res.status(400).json({ 
+        message: 'Sadece onaylanmış transferler kısmi karşılanabilir. Mevcut durum: ' + transfer.status 
+      });
+    }
+
+    // Sadece fabrika yetkilisi veya admin yapabilir
+    if (req.user.role !== 'admin' && req.user.branch !== 'fabrika') {
+      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+    }
+
+    // Kısmi miktar kontrolü
+    if (!partialQuantity || partialQuantity <= 0) {
+      return res.status(400).json({ message: 'Geçerli bir miktar giriniz' });
+    }
+
+    if (partialQuantity > transfer.quantity) {
+      return res.status(400).json({ 
+        message: `Kısmi miktar (${partialQuantity}), talep edilen miktardan (${transfer.quantity}) büyük olamaz` 
+      });
+    }
+
+    // Eğer tam miktar gönderiliyorsa, normal complete yapılmalı
+    if (partialQuantity === transfer.quantity) {
+      return res.status(400).json({ 
+        message: 'Tam miktar gönderilecekse "Tamamla" butonunu kullanın' 
+      });
+    }
+
+    // Stok kontrolü - Kaynak şubede yeterli stok var mı?
+    const sourceStock = await Stock.findOne({ 
+      productId: transfer.productId, 
+      branch: transfer.sourceBranch 
+    });
+    
+    if (!sourceStock || sourceStock.quantity < partialQuantity) {
+      return res.status(400).json({ 
+        message: `Yeterli stok yok! Mevcut: ${sourceStock?.quantity || 0}` 
+      });
+    }
+
+    // ✅ Kısmi stok işlemi
+    // 1. Kaynak şubeden düş
+    sourceStock.quantity -= partialQuantity;
+    await sourceStock.save();
+
+    // 2. Hedef şubeye ekle
+    let targetStock = await Stock.findOne({ 
+      productId: transfer.productId, 
+      branch: transfer.targetBranch 
+    });
+    
+    if (!targetStock) {
+      targetStock = new Stock({
+        productId: transfer.productId,
+        branch: transfer.targetBranch,
+        quantity: 0,
+        criticalLevel: 10
+      });
+    }
+    targetStock.quantity += partialQuantity;
+    await targetStock.save();
+
+    // Transfer durumunu güncelle
+    transfer.partialQuantity = partialQuantity;
+    transfer.partialNote = partialNote || 'Kısmi karşılama';
+    transfer.partialFulfilled = true;
+    transfer.partialFulfilledBy = req.user._id;
+    transfer.partialFulfilledAt = new Date();
+    transfer.status = 'partially_fulfilled';
+    await transfer.save();
+
+    await transfer.populate('requestedBy', 'name username');
+    await transfer.populate('partialFulfilledBy', 'name username');
+    await transfer.populate('productId', 'name category color');
+
+    res.json({ 
+      message: `✅ Kısmi karşılama tamamlandı: ${partialQuantity}/${transfer.quantity} adet gönderildi`,
+      transfer,
+      remainingQuantity: transfer.quantity - partialQuantity
+    });
+  } catch (error) {
+    console.error('❌ Kısmi karşılama hatası:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -192,6 +297,7 @@ router.put('/:id/reject', auth, async (req, res) => {
 
     res.json({ message: 'Transfer reddedildi', transfer });
   } catch (error) {
+    console.error('❌ Transfer reddetme hatası:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -205,8 +311,11 @@ router.put('/:id/complete', auth, async (req, res) => {
       return res.status(404).json({ message: 'Transfer bulunamadı' });
     }
 
-    if (transfer.status !== 'approved') {
-      return res.status(400).json({ message: 'Sadece onaylanmış transferler tamamlanabilir' });
+    // Hem approved hem partially_fulfilled tamamlanabilir
+    if (transfer.status !== 'approved' && transfer.status !== 'partially_fulfilled') {
+      return res.status(400).json({ 
+        message: 'Sadece onaylanmış veya kısmi karşılanmış transferler tamamlanabilir' 
+      });
     }
 
     // Sadece hedef şube veya admin tamamlayabilir
@@ -225,6 +334,7 @@ router.put('/:id/complete', auth, async (req, res) => {
 
     res.json({ message: 'Transfer tamamlandı', transfer });
   } catch (error) {
+    console.error('❌ Transfer tamamlama hatası:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -255,6 +365,7 @@ router.put('/:id/cancel', auth, async (req, res) => {
 
     res.json({ message: 'Transfer iptal edildi', transfer });
   } catch (error) {
+    console.error('❌ Transfer iptal hatası:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -264,13 +375,47 @@ router.get('/pending', auth, async (req, res) => {
   try {
     const transfers = await Transfer.find({ 
       status: 'pending',
-      sourceBranch: 'fabrika' // Sadece fabrikadan yapılan talepler
+      sourceBranch: 'fabrika'
     })
       .populate('requestedBy', 'name username')
       .populate('productId', 'name category color')
-      .sort({ createdAt: 1 }); // En eski talepler önce
+      .sort({ createdAt: 1 });
     res.json(transfers);
   } catch (error) {
+    console.error('❌ Bekleyen transferler getirilemedi:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 📌 ✅ YENİ: Kısmi karşılanmış transferleri getir
+router.get('/partial-fulfilled', auth, async (req, res) => {
+  try {
+    const transfers = await Transfer.find({ 
+      status: 'partially_fulfilled'
+    })
+      .populate('requestedBy', 'name username')
+      .populate('partialFulfilledBy', 'name username')
+      .populate('productId', 'name category color')
+      .sort({ createdAt: -1 });
+    res.json(transfers);
+  } catch (error) {
+    console.error('❌ Kısmi karşılanan transferler getirilemedi:', error);
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// 📌 ✅ YENİ: Onaylanmış ama henüz kısmi karşılanmamış transferler
+router.get('/awaiting-fulfillment', auth, async (req, res) => {
+  try {
+    const transfers = await Transfer.find({ 
+      status: 'approved'
+    })
+      .populate('requestedBy', 'name username')
+      .populate('productId', 'name category color')
+      .sort({ createdAt: 1 });
+    res.json(transfers);
+  } catch (error) {
+    console.error('❌ Bekleyen karşılamalar getirilemedi:', error);
     res.status(500).json({ message: error.message });
   }
 });
@@ -292,12 +437,14 @@ router.get('/stats/:branch', auth, async (req, res) => {
         $group: {
           _id: '$status',
           count: { $sum: 1 },
-          totalQuantity: { $sum: '$quantity' }
+          totalQuantity: { $sum: '$quantity' },
+          totalPartialQuantity: { $sum: '$partialQuantity' }
         }
       }
     ]);
     res.json(stats);
   } catch (error) {
+    console.error('❌ İstatistikler getirilemedi:', error);
     res.status(500).json({ message: error.message });
   }
 });

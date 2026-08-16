@@ -9,7 +9,8 @@ import {
   ClockIcon,
   CheckIcon,
   XMarkIcon,
-  ArrowPathIcon
+  ArrowPathIcon,
+  DocumentArrowDownIcon
 } from '@heroicons/react/24/outline';
 
 const Transfer = () => {
@@ -32,6 +33,16 @@ const Transfer = () => {
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [selectedBranch, setSelectedBranch] = useState('all');
 
+  // ✅ Kısmi Karşılama Modal State
+  const [partialModal, setPartialModal] = useState({
+    show: false,
+    transferId: null,
+    productName: '',
+    requestedQuantity: 0,
+    partialQuantity: '',
+    partialNote: ''
+  });
+
   const branches = [
     { value: 'fabrika', label: '🏭 Fabrika' },
     { value: 'karabaglar', label: '🏘️ Karabağlar' },
@@ -44,6 +55,7 @@ const Transfer = () => {
     { value: 'all', label: 'Tümü' },
     { value: 'pending', label: '⏳ Beklemede' },
     { value: 'approved', label: '✅ Onaylandı' },
+    { value: 'partially_fulfilled', label: '📦 Kısmi Karşılandı' },
     { value: 'completed', label: '✔️ Tamamlandı' },
     { value: 'rejected', label: '❌ Reddedildi' },
     { value: 'cancelled', label: '🚫 İptal Edildi' }
@@ -51,7 +63,6 @@ const Transfer = () => {
 
   const isFabrika = user?.role === 'admin' || user?.branch === 'fabrika';
 
-  // ✅ Verileri getir
   useEffect(() => {
     console.log('🔄 Transfer component mount edildi');
     fetchData();
@@ -72,7 +83,6 @@ const Transfer = () => {
 
       console.log('📡 Veriler çekiliyor...');
 
-      // ✅ Tüm verileri paralel çek
       const [productsRes, stocksRes, transfersRes, pendingRes] = await Promise.all([
         axios.get('/products'),
         axios.get('/stock'),
@@ -85,13 +95,11 @@ const Transfer = () => {
       console.log('📊 Gelen stoklar:', stocksRes.data);
       console.log('📊 Toplam stok sayısı:', stocksRes.data?.length || 0);
       
-      // ✅ Kategorilere göre say
       const kanatlar = productsRes.data?.filter(p => p.category === 'kanat') || [];
       const kasalar = productsRes.data?.filter(p => p.category === 'kasa') || [];
       const basliklar = productsRes.data?.filter(p => p.category === 'baslik') || [];
       console.log(`🚪 Kanat: ${kanatlar.length}, 🪟 Kasa: ${kasalar.length}, 🎯 Başlık: ${basliklar.length}`);
 
-      // ✅ State'leri güncelle
       setProducts(productsRes.data || []);
       setStocks(stocksRes.data || []);
       setTransfers(transfersRes.data || []);
@@ -120,7 +128,6 @@ const Transfer = () => {
     }
   };
 
-  // ✅ Düzeltilmiş getProductStock
   const getProductStock = (productId, branch) => {
     if (!productId || !stocks || stocks.length === 0) return 0;
     
@@ -199,6 +206,48 @@ const Transfer = () => {
     }
   };
 
+  // ✅ Kısmi Karşılama İşlemi
+  const handlePartialFulfill = async (e) => {
+    e.preventDefault();
+    
+    const { transferId, partialQuantity, partialNote, requestedQuantity } = partialModal;
+    
+    if (!partialQuantity || partialQuantity <= 0) {
+      toast.error('Geçerli bir miktar giriniz');
+      return;
+    }
+
+    if (parseInt(partialQuantity) > requestedQuantity) {
+      toast.error(`Talep edilen miktar ${requestedQuantity}, bundan fazla gönderemezsiniz`);
+      return;
+    }
+
+    if (parseInt(partialQuantity) === requestedQuantity) {
+      toast.error('Tam miktar gönderilecekse "Teslim Al" butonunu kullanın');
+      return;
+    }
+
+    try {
+      await axios.put(`/transfers/${transferId}/partial-fulfill`, {
+        partialQuantity: parseInt(partialQuantity),
+        partialNote: partialNote || 'Kısmi karşılama'
+      });
+      
+      toast.success(`✅ ${partialQuantity} adet kısmi karşılama tamamlandı!`);
+      setPartialModal({ 
+        show: false, 
+        transferId: null, 
+        productName: '',
+        requestedQuantity: 0, 
+        partialQuantity: '', 
+        partialNote: '' 
+      });
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Kısmi karşılama başarısız');
+    }
+  };
+
   const handleReject = async (transferId) => {
     const reason = prompt('Reddetme sebebini girin:');
     if (reason === null) return;
@@ -257,6 +306,7 @@ const Transfer = () => {
     const badges = {
       pending: { color: 'bg-yellow-100 text-yellow-800', icon: ClockIcon, label: '⏳ Beklemede' },
       approved: { color: 'bg-blue-100 text-blue-800', icon: CheckCircleIcon, label: '✅ Onaylandı' },
+      partially_fulfilled: { color: 'bg-orange-100 text-orange-800', icon: DocumentArrowDownIcon, label: '📦 Kısmi Karşılandı' },
       completed: { color: 'bg-green-100 text-green-800', icon: CheckCircleIcon, label: '✔️ Tamamlandı' },
       rejected: { color: 'bg-red-100 text-red-800', icon: XCircleIcon, label: '❌ Reddedildi' },
       cancelled: { color: 'bg-gray-100 text-gray-800', icon: XCircleIcon, label: '🚫 İptal Edildi' }
@@ -300,7 +350,7 @@ const Transfer = () => {
         </div>
       </div>
 
-      {/* ✅ Debug Bilgisi */}
+      {/* Debug Bilgisi */}
       <div className="bg-gray-100 p-3 rounded-lg text-xs text-gray-600 flex flex-wrap items-center gap-4">
         <span>📦 Ürün: <strong className="text-blue-600">{products.length}</strong></span>
         <span>📊 Stok: <strong className="text-green-600">{stocks.length}</strong></span>
@@ -407,7 +457,6 @@ const Transfer = () => {
               </div>
             )}
 
-            {/* ✅ Ürün Seçimi */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Ürün <span className="text-red-500">*</span>
@@ -665,6 +714,11 @@ const Transfer = () => {
                             <StatusIcon className="h-3 w-3 inline mr-1" />
                             {statusBadge.label}
                           </span>
+                          {transfer.status === 'partially_fulfilled' && (
+                            <span className="text-xs text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">
+                              {transfer.partialQuantity}/{transfer.quantity} gönderildi
+                            </span>
+                          )}
                         </div>
                         <div className="mt-1 grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm text-gray-600">
                           <div>
@@ -683,6 +737,9 @@ const Transfer = () => {
                         {transfer.note && (
                           <p className="text-sm text-gray-500 mt-1">📝 {transfer.note}</p>
                         )}
+                        {transfer.partialNote && (
+                          <p className="text-sm text-orange-500 mt-1">📦 Kısmi not: {transfer.partialNote}</p>
+                        )}
                         {transfer.rejectionReason && (
                           <p className="text-sm text-red-500 mt-1">❌ Red sebebi: {transfer.rejectionReason}</p>
                         )}
@@ -691,6 +748,24 @@ const Transfer = () => {
                         <span className="text-xs text-gray-400">
                           {new Date(transfer.createdAt).toLocaleString('tr-TR')}
                         </span>
+                        
+                        {/* ✅ Kısmi Karşılama Butonu - Fabrika için */}
+                        {transfer.status === 'approved' && isFabrika && (
+                          <button
+                            onClick={() => setPartialModal({
+                              show: true,
+                              transferId: transfer._id,
+                              productName: transfer.productId?.name || 'Ürün',
+                              requestedQuantity: transfer.quantity,
+                              partialQuantity: '',
+                              partialNote: ''
+                            })}
+                            className="text-xs bg-yellow-500 text-white px-3 py-1 rounded-lg hover:bg-yellow-600 transition-colors"
+                          >
+                            📦 Kısmi Gönder
+                          </button>
+                        )}
+
                         {transfer.status === 'pending' && transfer.requestedBy?._id === user?._id && (
                           <button
                             onClick={() => handleCancel(transfer._id)}
@@ -699,12 +774,22 @@ const Transfer = () => {
                             İptal Et
                           </button>
                         )}
+                        
                         {transfer.status === 'approved' && transfer.targetBranch === user?.branch && (
                           <button
                             onClick={() => handleComplete(transfer._id)}
                             className="text-xs text-green-600 hover:text-green-800 font-medium"
                           >
                             ✔️ Teslim Al
+                          </button>
+                        )}
+
+                        {transfer.status === 'partially_fulfilled' && transfer.targetBranch === user?.branch && (
+                          <button
+                            onClick={() => handleComplete(transfer._id)}
+                            className="text-xs text-green-600 hover:text-green-800 font-medium"
+                          >
+                            ✔️ Teslim Al (Kalan: {transfer.quantity - transfer.partialQuantity} adet)
                           </button>
                         )}
                       </div>
@@ -714,6 +799,87 @@ const Transfer = () => {
               })}
             </div>
           )}
+        </div>
+      )}
+
+      {/* ✅ Kısmi Karşılama Modalı */}
+      {partialModal.show && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4">
+            <h2 className="text-xl font-bold text-gray-900 mb-4">📦 Kısmi Karşılama</h2>
+            
+            <p className="text-sm text-gray-600 mb-2">
+              <strong>Ürün:</strong> {partialModal.productName}
+            </p>
+            <div className="bg-blue-50 p-3 rounded-lg mb-4">
+              <p className="text-sm text-blue-800">
+                <strong>Talep edilen miktar:</strong> {partialModal.requestedQuantity} adet
+              </p>
+            </div>
+
+            <form onSubmit={handlePartialFulfill} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Göndermek istediğiniz miktar <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  value={partialModal.partialQuantity}
+                  onChange={(e) => setPartialModal({ 
+                    ...partialModal, 
+                    partialQuantity: e.target.value 
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  placeholder="Miktar girin"
+                  min="1"
+                  max={partialModal.requestedQuantity - 1}
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Maksimum: {partialModal.requestedQuantity - 1} adet (Tam miktar için "Teslim Al" butonunu kullanın)
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Not (Opsiyonel)
+                </label>
+                <textarea
+                  value={partialModal.partialNote}
+                  onChange={(e) => setPartialModal({ 
+                    ...partialModal, 
+                    partialNote: e.target.value 
+                  })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                  rows="3"
+                  placeholder="Kısmi gönderim notu..."
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  type="submit"
+                  className="flex-1 bg-yellow-500 text-white px-4 py-2 rounded-lg hover:bg-yellow-600 transition-colors"
+                >
+                  ✅ Kısmi Gönder
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPartialModal({ 
+                    show: false, 
+                    transferId: null, 
+                    productName: '',
+                    requestedQuantity: 0, 
+                    partialQuantity: '', 
+                    partialNote: '' 
+                  })}
+                  className="flex-1 bg-gray-300 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-400 transition-colors"
+                >
+                  İptal
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
