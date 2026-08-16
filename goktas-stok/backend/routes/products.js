@@ -1,9 +1,10 @@
+// routes/products.js
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
 const Stock = require('../models/Stock');
 const auth = require('../middleware/auth');
-const authorize = require('../middleware/authorize');
+const { authorize } = require('../middleware/authorize');
 
 // 📌 Tüm ürünleri getir
 router.get('/', auth, async (req, res) => {
@@ -16,15 +17,12 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// 📌 Yeni ürün ekle - OTOMATİK STOK OLUŞTUR
-router.post('/', auth, authorize.admin, async (req, res) => {
+// 📌 Yeni ürün ekle - ✅ DÜZELTİLDİ
+router.post('/', auth, authorize(['admin']), async (req, res) => {
   try {
-    console.log('📥 Yeni ürün isteği:', req.body);
-    
     const { name, description, unit, category, color } = req.body;
     const productCategory = category || 'kanat';
     
-    // ✅ GEÇERLİ KATEGORİ KONTROLÜ - baslik EKLENDİ
     const validCategories = ['kanat', 'kasa', 'baslik'];
     if (!validCategories.includes(productCategory)) {
       return res.status(400).json({ 
@@ -32,14 +30,12 @@ router.post('/', auth, authorize.admin, async (req, res) => {
       });
     }
 
-    // ✅ Renk kontrolü (Kasa ve Başlık için zorunlu)
     if ((productCategory === 'kasa' || productCategory === 'baslik') && !color) {
       return res.status(400).json({ 
         message: 'Kasa ve Başlık kategorileri için renk seçimi zorunludur' 
       });
     }
 
-    // ✅ Aynı isimde ürün var mı kontrol et
     const existingProduct = await Product.findOne({ 
       name, 
       category: productCategory,
@@ -51,7 +47,6 @@ router.post('/', auth, authorize.admin, async (req, res) => {
       });
     }
 
-    // ✅ Ürünü oluştur
     const product = new Product({
       name,
       description: description || '',
@@ -62,9 +57,7 @@ router.post('/', auth, authorize.admin, async (req, res) => {
     });
     
     await product.save();
-    console.log('✅ Ürün eklendi:', product);
-    
-    // ✅ TÜM ŞUBELER İÇİN STOK KAYDI OLUŞTUR
+
     const branches = ['fabrika', 'karabaglar', 'manisa', 'edremit', 'karsiyaka'];
     const stockEntries = branches.map(branch => ({
       productId: product._id,
@@ -74,8 +67,7 @@ router.post('/', auth, authorize.admin, async (req, res) => {
     }));
     
     await Stock.insertMany(stockEntries);
-    console.log(`✅ ${branches.length} şube için stok kaydı oluşturuldu`);
-    
+
     res.status(201).json(product);
   } catch (error) {
     console.error('❌ Ürün eklenirken hata:', error);
@@ -84,7 +76,7 @@ router.post('/', auth, authorize.admin, async (req, res) => {
 });
 
 // 📌 Ürün güncelle
-router.put('/:id', auth, authorize.admin, async (req, res) => {
+router.put('/:id', auth, authorize(['admin']), async (req, res) => {
   try {
     const { name, description, category, color, isActive } = req.body;
     
@@ -93,7 +85,6 @@ router.put('/:id', auth, authorize.admin, async (req, res) => {
       return res.status(404).json({ message: 'Ürün bulunamadı' });
     }
     
-    // ✅ Kategori kontrolü
     if (category) {
       const validCategories = ['kanat', 'kasa', 'baslik'];
       if (!validCategories.includes(category)) {
@@ -104,7 +95,6 @@ router.put('/:id', auth, authorize.admin, async (req, res) => {
       product.category = category;
     }
 
-    // ✅ Renk kontrolü
     if (color !== undefined) {
       const validColors = ['bute_beyaz', 'koyu_gri', 'acik_gri', 'tas_gri', null];
       if (!validColors.includes(color)) {
@@ -128,7 +118,7 @@ router.put('/:id', auth, authorize.admin, async (req, res) => {
 });
 
 // 📌 Ürün sil (soft delete)
-router.delete('/:id', auth, authorize.admin, async (req, res) => {
+router.delete('/:id', auth, authorize(['admin']), async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {

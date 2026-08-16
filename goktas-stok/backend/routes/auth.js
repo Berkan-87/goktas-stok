@@ -4,7 +4,7 @@ const { body, validationResult } = require('express-validator');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
-const { admin } = require('../middleware/authorize');
+const { authorize } = require('../middleware/authorize'); // ✅ DÜZELTİLDİ
 
 // Giriş yap
 router.post('/login', [
@@ -24,16 +24,16 @@ router.post('/login', [
       return res.status(401).json({ message: 'Geçersiz kullanıcı adı veya şifre' });
     }
 
-    // ✅ DÜZELTİLDİ - expiresIn sabit değer '7d' (7 gün)
     const token = jwt.sign(
       { 
         id: user._id, 
         role: user.role, 
         branch: user.branch,
-        productionRole: user.productionRole 
+        productionRole: user.productionRole,
+        materialDepoAccess: user.materialDepoAccess
       },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }  // 7 gün geçerli
+      process.env.JWT_SECRET || 'secret',
+      { expiresIn: '7d' }
     );
 
     res.json({
@@ -44,7 +44,8 @@ router.post('/login', [
         name: user.name,
         role: user.role,
         branch: user.branch,
-        productionRole: user.productionRole
+        productionRole: user.productionRole,
+        materialDepoAccess: user.materialDepoAccess
       }
     });
   } catch (error) {
@@ -54,7 +55,7 @@ router.post('/login', [
 });
 
 // Kullanıcı oluştur (sadece admin)
-router.post('/users', [auth, admin], [
+router.post('/users', [auth, authorize(['admin'])], [ // ✅ DÜZELTİLDİ
   body('username').notEmpty().withMessage('Kullanıcı adı gerekli'),
   body('password').notEmpty().withMessage('Şifre gerekli').isLength({ min: 6 }),
   body('name').notEmpty().withMessage('İsim gerekli'),
@@ -66,7 +67,7 @@ router.post('/users', [auth, admin], [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { username, password, name, role, branch, productionRole } = req.body;
+    const { username, password, name, role, branch, productionRole, materialDepoAccess } = req.body;
     
     const existingUser = await User.findOne({ username });
     if (existingUser) {
@@ -78,8 +79,9 @@ router.post('/users', [auth, admin], [
       password, 
       name, 
       role, 
-      branch,
-      productionRole: role === 'production_manager' ? productionRole : null
+      branch: role === 'admin' ? null : branch,
+      productionRole: role === 'production_manager' ? productionRole : null,
+      materialDepoAccess: materialDepoAccess || false
     });
     await user.save();
 
@@ -91,7 +93,8 @@ router.post('/users', [auth, admin], [
         name: user.name,
         role: user.role,
         branch: user.branch,
-        productionRole: user.productionRole
+        productionRole: user.productionRole,
+        materialDepoAccess: user.materialDepoAccess
       }
     });
   } catch (error) {
@@ -101,7 +104,7 @@ router.post('/users', [auth, admin], [
 });
 
 // Tüm kullanıcıları getir (sadece admin)
-router.get('/users', [auth, admin], async (req, res) => {
+router.get('/users', [auth, authorize(['admin'])], async (req, res) => { // ✅ DÜZELTİLDİ
   try {
     const users = await User.find().select('-password');
     res.json(users);
@@ -114,7 +117,7 @@ router.get('/users', [auth, admin], async (req, res) => {
 // Mevcut kullanıcı bilgilerini getir
 router.get('/me', auth, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select('-password');
+    const user = await User.findById(req.user.id).select('-password');
     res.json(user);
   } catch (error) {
     console.error('❌ Kullanıcı bilgisi hatası:', error);
