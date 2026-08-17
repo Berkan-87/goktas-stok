@@ -1,5 +1,5 @@
 // frontend/src/components/MainLayout.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
@@ -26,17 +26,18 @@ const MainLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // ✅ Okunmamış mesaj sayısını getir
-  const fetchUnreadCount = async () => {
+  // ✅ Okunmamış mesaj sayısını getir - useCallback ile
+  const fetchUnreadCount = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
       
       const response = await axios.get('/messages/unread-count');
       const count = response.data?.total || 0;
-      setUnreadCount(count);
       
-      // ✅ LocalStorage'ı da güncelle
+      console.log('📊 Okunmamış mesaj sayısı güncellendi:', count); // ✅ DEBUG
+      
+      setUnreadCount(count);
       localStorage.setItem('chatUnreadCount', String(count));
       
       if (count > 0) {
@@ -45,25 +46,25 @@ const MainLayout = () => {
         document.title = 'GÖKTAŞ KAPI';
       }
     } catch (error) {
-      // Sessizce hata geç
+      console.error('❌ Okunmamış mesaj sayısı alınamadı:', error);
     }
-  };
+  }, []);
 
   // ✅ Sayfa yüklendiğinde ve her 3 saniyede bir kontrol et
   useEffect(() => {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchUnreadCount]);
 
-  // ✅ Storage event dinleyicisi - sayfalar arası senkronizasyon
+  // ✅ Storage event dinleyicisi
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === 'chatUnreadCount') {
         const newCount = parseInt(e.newValue) || 0;
+        console.log('📊 Storage event ile güncellendi:', newCount); // ✅ DEBUG
         setUnreadCount(newCount);
         
-        // Browser sekmesini güncelle
         if (newCount > 0) {
           document.title = `(${newCount}) GÖKTAŞ KAPI`;
         } else {
@@ -83,6 +84,7 @@ const MainLayout = () => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
+        console.log('📊 Sayfa görünür oldu, kontrol ediliyor...');
         fetchUnreadCount();
       }
     };
@@ -91,16 +93,20 @@ const MainLayout = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, []);
+  }, [fetchUnreadCount]);
 
   // ✅ Sohbet sayfasına gidince sayacı sıfırla
   useEffect(() => {
     if (location.pathname === '/sohbet') {
+      console.log('📊 Sohbet sayfasına girildi, sayaç sıfırlanıyor...');
       setUnreadCount(0);
       document.title = 'GÖKTAŞ KAPI';
       localStorage.setItem('chatUnreadCount', '0');
     }
   }, [location.pathname]);
+
+  // ✅ Her render'da unreadCount değerini logla
+  console.log('📊 UnreadCount state değeri:', unreadCount);
 
   const menuItems = [
     { name: 'Ana Sayfa', icon: HomeIcon, path: '/' },
@@ -186,7 +192,7 @@ const MainLayout = () => {
                 }`} />
                 <span className="font-medium flex-1">{item.name}</span>
                 
-                {/* Badge */}
+                {/* ✅ Badge - Direkt item.badge kontrolü */}
                 {hasBadge && (
                   <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center animate-pulse">
                     {item.badge > 99 ? '99+' : item.badge}

@@ -335,6 +335,27 @@ const Chat = () => {
     } catch (error) {
       console.error('Mesaj okuma hatası:', error);
     }
+    // Chat.js - markMessageAsRead sonuna ekleyin
+    const markMessageAsRead = async (messageId) => {
+      try {
+        await axios.put(`/messages/read/${messageId}`);
+        
+        // ... state güncellemeleri ...
+        
+        // ✅ ZORLA SIFIRLA
+        localStorage.setItem('chatUnreadCount', '0');
+        window.dispatchEvent(new Event('storage'));
+        
+        // ✅ State'i doğrudan güncelle
+        window.dispatchEvent(new CustomEvent('unreadCountUpdate', { 
+          detail: { count: 0 } 
+        }));
+        
+      } catch (error) {
+        console.error('Mesaj okuma hatası:', error);
+      }
+    };
+
   };
 
   // ✅ Okunmamış sayılarını güncelle
