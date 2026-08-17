@@ -23,11 +23,9 @@ const StockList = () => {
   const [products, setProducts] = useState([]);
   const [selectedBranch, setSelectedBranch] = useState(user?.branch || 'fabrika');
   const [showAddProduct, setShowAddProduct] = useState(false);
-  // ❌ code kaldırıldı
   const [newProduct, setNewProduct] = useState({ name: '', description: '', category: 'kanat', color: '' });
   const [modalData, setModalData] = useState({ show: false, type: '', productId: '', branch: '', currentStock: 0 });
   const [editingProduct, setEditingProduct] = useState(null);
-  // ❌ code kaldırıldı
   const [editForm, setEditForm] = useState({ name: '', description: '', category: '', color: '' });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(null);
   const [expandedGroups, setExpandedGroups] = useState({});
@@ -35,7 +33,6 @@ const StockList = () => {
   const [loading, setLoading] = useState(true);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
 
-  // 🎯 RENKLER - HEM KASA HEM BAŞLIK İÇİN AYNI
   const colors = [
     { id: 'bute_beyaz', label: 'Bute Beyaz', color: '#f3f4f6', textColor: '#1f2937', emoji: '⚪' },
     { id: 'koyu_gri', label: 'Koyu Gri', color: '#4b5563', textColor: '#ffffff', emoji: '⚫' },
@@ -73,15 +70,17 @@ const StockList = () => {
     }
   };
 
-  // ✅ EXPORT FONKSİYONLARI - code kaldırıldı
+  // ✅ EXPORT FONKSİYONLARI - SADECE STOK > 0 OLANLAR
   const handleExportExcel = () => {
-    if (stocks.length === 0) {
+    // ✅ Sadece stok miktarı 0'dan büyük olanları filtrele
+    const filteredStocks = stocks.filter(s => s.quantity > 0);
+    
+    if (filteredStocks.length === 0) {
       toast.error('Export yapılacak veri bulunamadı!');
       return;
     }
 
-    const exportData = stocks.map(stock => ({
-      // ❌ 'Ürün Kodu' KALDIRILDI
+    const exportData = filteredStocks.map(stock => ({
       'Ürün Adı': stock.productId?.name || '-',
       'Kategori': stock.productId?.category === 'kanat' ? '🚪 Kanat' : 
                   stock.productId?.category === 'kasa' ? '🪟 Kasa Takım' : '🎯 Başlık',
@@ -107,13 +106,15 @@ const StockList = () => {
   };
 
   const handleExportPDF = () => {
-    if (stocks.length === 0) {
+    // ✅ Sadece stok miktarı 0'dan büyük olanları filtrele
+    const filteredStocks = stocks.filter(s => s.quantity > 0);
+    
+    if (filteredStocks.length === 0) {
       toast.error('Export yapılacak veri bulunamadı!');
       return;
     }
 
-    const exportData = stocks.map(stock => ({
-      // ❌ 'Ürün Kodu' KALDIRILDI
+    const exportData = filteredStocks.map(stock => ({
       'Ürün Adı': stock.productId?.name || '-',
       'Kategori': stock.productId?.category === 'kanat' ? 'Kanat' : 
                   stock.productId?.category === 'kasa' ? 'Kasa Takım' : 'Başlık',
@@ -127,7 +128,6 @@ const StockList = () => {
     }));
 
     const columns = [
-      // ❌ 'Ürün Kodu' KALDIRILDI
       { key: 'Ürün Adı', label: 'Ürün Adı' },
       { key: 'Kategori', label: 'Kategori' },
       { key: 'Renk', label: 'Renk' },
@@ -149,9 +149,12 @@ const StockList = () => {
     setExportDropdownOpen(false);
   };
 
-  // ✅ Kategori bazlı export - code kaldırıldı
+  // ✅ Kategori bazlı export - SADECE STOK > 0 OLANLAR
   const handleExportFiltered = (category) => {
-    const filteredStocks = stocks.filter(s => s.productId?.category === category);
+    // ✅ Sadece stok miktarı 0'dan büyük olanları filtrele
+    const filteredStocks = stocks.filter(s => 
+      s.productId?.category === category && s.quantity > 0
+    );
     
     if (filteredStocks.length === 0) {
       const categoryName = category === 'kanat' ? 'Kanat' : 
@@ -161,7 +164,6 @@ const StockList = () => {
     }
 
     const exportData = filteredStocks.map(stock => ({
-      // ❌ 'Ürün Kodu' KALDIRILDI
       'Ürün Adı': stock.productId?.name || '-',
       'Kategori': stock.productId?.category === 'kanat' ? '🚪 Kanat' : 
                   stock.productId?.category === 'kasa' ? '🪟 Kasa Takım' : '🎯 Başlık',
@@ -217,16 +219,13 @@ const StockList = () => {
     }
   };
 
-  // ✅ handleAddProduct - code kaldırıldı
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    // ❌ code kontrolü kaldırıldı
     if (!newProduct.name) {
       toast.error('Ürün adı zorunludur');
       return;
     }
 
-    // Renk kontrolü (Kasa ve Başlık için zorunlu)
     if ((newProduct.category === 'kasa' || newProduct.category === 'baslik') && !newProduct.color) {
       toast.error('Bu kategori için renk seçmelisiniz');
       return;
@@ -234,7 +233,6 @@ const StockList = () => {
 
     try {
       console.log('📤 Yeni ürün gönderiliyor:', newProduct);
-      // ❌ code gönderilmiyor
       const response = await axios.post('/products', {
         name: newProduct.name,
         description: newProduct.description,
@@ -265,11 +263,9 @@ const StockList = () => {
     }
   };
 
-  // ✅ handleEditProduct - code kaldırıldı
   const handleEditProduct = async (e) => {
     e.preventDefault();
     try {
-      // ❌ code gönderilmiyor
       const updateData = {
         name: editForm.name,
         description: editForm.description,
@@ -314,7 +310,6 @@ const StockList = () => {
     return Math.min(percentage, 100);
   };
 
-  // ✅ Ürünün rengini bul (Kasa ve Başlık için)
   const getProductColor = (product) => {
     if (product.color) {
       return product.color;
@@ -322,7 +317,7 @@ const StockList = () => {
     
     const name = product.name.toUpperCase();
     
-    if (name.includes('TAŞ') || name.includes('TAS') || name.includes('TG')) {
+    if (name.includes('TAŚ') || name.includes('TAS') || name.includes('TG')) {
       return 'tas_gri';
     }
     if (name.includes('KOYU') || name.includes('KG')) {
@@ -338,7 +333,6 @@ const StockList = () => {
     return null;
   };
 
-  // ✅ Ürünleri modellerine göre grupla (KANAT için)
   const groupProductsByModel = (category) => {
     const filteredProducts = products.filter(p => p.category === category);
     const groups = {};
@@ -352,7 +346,6 @@ const StockList = () => {
     return groups;
   };
 
-  // ✅ Ürünleri renklerine göre grupla (KASA ve BAŞLIK için)
   const groupProductsByColor = (category) => {
     const filteredProducts = products.filter(p => p.category === category);
     const groups = {};
@@ -395,7 +388,6 @@ const StockList = () => {
     }));
   };
 
-  // ✅ Kanat Grup Kartı
   const KanatGroupCard = ({ groupName, products: groupProducts }) => {
     const isExpanded = expandedGroups[groupName] !== false;
     const totalStock = groupProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
@@ -440,7 +432,6 @@ const StockList = () => {
     );
   };
 
-  // ✅ Renk Kartı (Kasa ve Başlık için ortak)
   const ColorCard = ({ colorLabel, products: colorProducts, category }) => {
     const isExpanded = expandedGroups[colorLabel] !== false;
     const totalStock = colorProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
@@ -523,7 +514,6 @@ const StockList = () => {
     );
   };
 
-  // ✅ Ürün Kartı Render - code kaldırıldı
   const renderProductCard = (product) => {
     const quantity = getStockForProduct(product._id);
     const barWidth = getBarWidth(quantity);
@@ -546,7 +536,6 @@ const StockList = () => {
                 className="input-field text-xs py-1"
                 required
               />
-              {/* ❌ code alanı KALDIRILDI */}
               <select
                 value={editForm.category || product.category}
                 onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
@@ -587,7 +576,6 @@ const StockList = () => {
           ) : (
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-gray-800 text-sm">{product.name}</span>
-              {/* ❌ code gösterimi KALDIRILDI */}
               <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
                 {product.category === 'kanat' ? '🚪' : 
                  product.category === 'kasa' ? '🪟' : '🎯'}
@@ -691,12 +679,10 @@ const StockList = () => {
     );
   };
 
-  // Kategorilere göre ürünleri grupla
   const kanatGroups = groupProductsByModel('kanat');
   const kasaGroups = groupProductsByColor('kasa');
   const baslikGroups = groupProductsByColor('baslik');
 
-  // Kasa gruplarını renk sırasına göre düzenle
   const orderedKasaGroups = {};
   colors.forEach(color => {
     if (kasaGroups[color.label] && kasaGroups[color.label].length > 0) {
@@ -707,7 +693,6 @@ const StockList = () => {
     orderedKasaGroups['Diğer'] = kasaGroups['Diğer'];
   }
 
-  // Başlık gruplarını renk sırasına göre düzenle
   const orderedBaslikGroups = {};
   colors.forEach(color => {
     if (baslikGroups[color.label] && baslikGroups[color.label].length > 0) {
@@ -735,14 +720,12 @@ const StockList = () => {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold text-gray-900">📦 Stok Listesi</h1>
           <p className="text-sm text-gray-600 mt-1">Ürünleri kategorilere göre gruplanmış olarak görüntüleyin</p>
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          {/* EXPORT BUTONLARI */}
           <div className="flex items-center gap-1 sm:gap-2">
             <button
               onClick={handleExportExcel}
@@ -762,7 +745,6 @@ const StockList = () => {
               <span className="hidden xs:inline text-gray-700">PDF</span>
             </button>
 
-            {/* Kategori Bazlı Export Dropdown */}
             <div className="relative">
               <button
                 onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
@@ -829,7 +811,6 @@ const StockList = () => {
         </div>
       </div>
 
-      {/* Kategori Sekmeleri */}
       <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
         <button
           onClick={() => setActiveTab('kanat')}
@@ -872,7 +853,6 @@ const StockList = () => {
         </button>
       </div>
 
-      {/* Kategori İçeriği */}
       <div className="space-y-4">
         {activeTab === 'kanat' ? (
           Object.keys(kanatGroups).length === 0 ? (
@@ -924,7 +904,6 @@ const StockList = () => {
         )}
       </div>
 
-      {/* Modal - Stok Giriş/Çıkış */}
       {modalData.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -965,7 +944,6 @@ const StockList = () => {
         </div>
       )}
 
-      {/* Modal - Silme Onay */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -993,7 +971,6 @@ const StockList = () => {
         </div>
       )}
 
-      {/* Modal - Yeni Ürün Ekle - code kaldırıldı */}
       {showAddProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto">
@@ -1036,8 +1013,6 @@ const StockList = () => {
                   </p>
                 </div>
               )}
-
-              {/* ❌ Model Kodu alanı KALDIRILDI */}
 
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Ürün Adı *</label>
