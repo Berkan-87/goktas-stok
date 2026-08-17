@@ -1,9 +1,8 @@
 // frontend/src/components/MainLayout.js
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
 import { logout } from '../../store/slices/authSlice';
-import axios from '../../utils/axios';
 import {
   HomeIcon,
   CubeIcon,
@@ -24,89 +23,6 @@ const MainLayout = () => {
   const dispatch = useDispatch();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // ✅ Okunmamış mesaj sayısını getir - useCallback ile
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (!token) return;
-      
-      const response = await axios.get('/messages/unread-count');
-      const count = response.data?.total || 0;
-      
-      console.log('📊 Okunmamış mesaj sayısı güncellendi:', count); // ✅ DEBUG
-      
-      setUnreadCount(count);
-      localStorage.setItem('chatUnreadCount', String(count));
-      
-      if (count > 0) {
-        document.title = `(${count}) GÖKTAŞ KAPI`;
-      } else {
-        document.title = 'GÖKTAŞ KAPI';
-      }
-    } catch (error) {
-      console.error('❌ Okunmamış mesaj sayısı alınamadı:', error);
-    }
-  }, []);
-
-  // ✅ Sayfa yüklendiğinde ve her 3 saniyede bir kontrol et
-  useEffect(() => {
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 3000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
-
-  // ✅ Storage event dinleyicisi
-  useEffect(() => {
-    const handleStorageChange = (e) => {
-      if (e.key === 'chatUnreadCount') {
-        const newCount = parseInt(e.newValue) || 0;
-        console.log('📊 Storage event ile güncellendi:', newCount); // ✅ DEBUG
-        setUnreadCount(newCount);
-        
-        if (newCount > 0) {
-          document.title = `(${newCount}) GÖKTAŞ KAPI`;
-        } else {
-          document.title = 'GÖKTAŞ KAPI';
-        }
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    
-    return () => {
-      window.removeEventListener('storage', handleStorageChange);
-    };
-  }, []);
-
-  // ✅ Sayfa görünür olduğunda kontrol et
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('📊 Sayfa görünür oldu, kontrol ediliyor...');
-        fetchUnreadCount();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [fetchUnreadCount]);
-
-  // ✅ Sohbet sayfasına gidince sayacı sıfırla
-  useEffect(() => {
-    if (location.pathname === '/sohbet') {
-      console.log('📊 Sohbet sayfasına girildi, sayaç sıfırlanıyor...');
-      setUnreadCount(0);
-      document.title = 'GÖKTAŞ KAPI';
-      localStorage.setItem('chatUnreadCount', '0');
-    }
-  }, [location.pathname]);
-
-  // ✅ Her render'da unreadCount değerini logla
-  console.log('📊 UnreadCount state değeri:', unreadCount);
 
   const menuItems = [
     { name: 'Ana Sayfa', icon: HomeIcon, path: '/' },
@@ -114,12 +30,7 @@ const MainLayout = () => {
     { name: 'Siparişler', icon: ClipboardDocumentListIcon, path: '/uretim' },
     { name: 'Talep-Transfer', icon: ArrowsRightLeftIcon, path: '/transfer' },
     { name: 'Malzeme Depo', icon: BuildingStorefrontIcon, path: '/malzeme-depo' },
-    { 
-      name: 'İletişim', 
-      icon: ChatBubbleLeftRightIcon, 
-      path: '/sohbet',
-      badge: unreadCount
-    },
+    { name: 'İletişim', icon: ChatBubbleLeftRightIcon, path: '/sohbet' }, // ✅ Badge KALDIRILDI
     { name: 'Geçmiş', icon: ClockIcon, path: '/gecmis' },
   ];
 
@@ -137,11 +48,6 @@ const MainLayout = () => {
         <h1 className="text-lg font-bold text-blue-600 flex items-center gap-2">
           <img src="/logo192.png" alt="Göktaş Stok Logo" className="h-6 w-6 object-contain" />
           GÖKTAŞ KAPI
-          {unreadCount > 0 && (
-            <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
-              {unreadCount}
-            </span>
-          )}
         </h1>
         <button onClick={() => setSidebarOpen(!sidebarOpen)}>
           {sidebarOpen ? (
@@ -162,11 +68,6 @@ const MainLayout = () => {
           <h1 className="text-lg font-bold text-blue-600 flex items-center gap-2">
             <img src="/logo192.png" alt="Göktaş Stok Logo" className="h-6 w-6 object-contain" />
             GÖKTAŞ KAPI
-            {unreadCount > 0 && (
-              <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
-                {unreadCount}
-              </span>
-            )}
           </h1>
           <p className="text-sm text-gray-500 mt-1">{user?.name}</p>
         </div>
@@ -174,8 +75,6 @@ const MainLayout = () => {
         <nav className="flex-1 overflow-y-auto p-4 space-y-1">
           {menuItems.map((item) => {
             const Icon = item.icon;
-            const hasBadge = item.badge !== undefined && item.badge > 0;
-            
             return (
               <Link
                 key={item.path}
@@ -190,14 +89,7 @@ const MainLayout = () => {
                 <Icon className={`h-5 w-5 ${
                   isActive(item.path) ? 'text-blue-600' : 'text-gray-500'
                 }`} />
-                <span className="font-medium flex-1">{item.name}</span>
-                
-                {/* ✅ Badge - Direkt item.badge kontrolü */}
-                {hasBadge && (
-                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[20px] text-center animate-pulse">
-                    {item.badge > 99 ? '99+' : item.badge}
-                  </span>
-                )}
+                <span className="font-medium">{item.name}</span>
               </Link>
             );
           })}
