@@ -317,7 +317,7 @@ const StockList = () => {
     
     const name = product.name.toUpperCase();
     
-    if (name.includes('TAŚ') || name.includes('TAS') || name.includes('TG')) {
+    if (name.includes('TAŞ')|| name.includes('TAS') || name.includes('TG')) {
       return 'tas_gri';
     }
     if (name.includes('KOYU') || name.includes('KG')) {
