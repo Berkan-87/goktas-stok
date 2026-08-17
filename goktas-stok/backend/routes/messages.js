@@ -55,7 +55,6 @@ router.get('/private/:userId', auth, async (req, res) => {
   try {
     const { userId } = req.params;
     
-    // ✅ Sadece iki kullanıcı arasındaki mesajlar
     const messages = await Message.find({
       receiver: { $ne: null },
       group: null,
@@ -66,7 +65,7 @@ router.get('/private/:userId', auth, async (req, res) => {
     })
       .populate('sender', 'username name')
       .populate('receiver', 'username name')
-      .sort({ createdAt: -1 }); // ✅ En yeni en üstte
+      .sort({ createdAt: -1 });
 
     res.json(messages);
   } catch (error) {
@@ -83,7 +82,7 @@ router.get('/general', auth, async (req, res) => {
       group: null
     })
       .populate('sender', 'username name')
-      .sort({ createdAt: -1 }); // ✅ En yeni en üstte
+      .sort({ createdAt: -1 });
 
     res.json(messages);
   } catch (error) {
@@ -108,7 +107,7 @@ router.get('/group/:groupId', auth, async (req, res) => {
 
     const messages = await Message.find({ group: groupId })
       .populate('sender', 'username name')
-      .sort({ createdAt: -1 }); // ✅ En yeni en üstte
+      .sort({ createdAt: -1 });
 
     res.json(messages);
   } catch (error) {
@@ -137,39 +136,29 @@ router.put('/read/:messageId', auth, async (req, res) => {
   }
 });
 
-// ✅ TÜM MESAJLARI OKUNDU İŞARETLE
+// ✅ TÜM MESAJLARI OKUNDU İŞARETLE - DÜZELTİLDİ
 router.put('/mark-all-read', auth, async (req, res) => {
   try {
-    const { receiver, group } = req.body;
-    let filter = {};
-
-    if (!receiver && !group) {
-      filter = { receiver: null, group: null };
-    } else if (receiver) {
-      filter = {
-        receiver: receiver,
-        sender: req.user._id
-      };
-    } else if (group) {
-      filter = { group };
-    }
-
-    const unreadMessages = await Message.find({
-      ...filter,
-      readBy: { $ne: req.user._id }
-    });
-
-    const idsToUpdate = unreadMessages.map(m => m._id);
-    if (idsToUpdate.length > 0) {
-      await Message.updateMany(
-        { _id: { $in: idsToUpdate } },
-        { $addToSet: { readBy: req.user._id } }
-      );
-    }
-
+    const userId = req.user._id;
+    
+    // ✅ TÜM okunmamış mesajları bul (genel, özel, grup)
+    const filter = {
+      readBy: { $ne: userId },
+      sender: { $ne: userId }
+    };
+    
+    // Tüm mesajları güncelle
+    const result = await Message.updateMany(
+      filter,
+      { $addToSet: { readBy: userId } }
+    );
+    
+    console.log(`✅ ${result.modifiedCount} mesaj okundu olarak işaretlendi`);
+    
     res.json({ 
-      message: `${idsToUpdate.length} mesaj okundu olarak işaretlendi.`,
-      count: idsToUpdate.length
+      success: true, 
+      message: `${result.modifiedCount} mesaj okundu olarak işaretlendi`,
+      count: result.modifiedCount 
     });
   } catch (error) {
     console.error('❌ Toplu okuma hatası:', error);
@@ -180,24 +169,33 @@ router.put('/mark-all-read', auth, async (req, res) => {
 // ✅ OKUNMAMIŞ MESAJ SAYISI
 router.get('/unread-count', auth, async (req, res) => {
   try {
-    // Özel mesajlardaki okunmamış sayısı
-    const privateUnread = await Message.countDocuments({
-      receiver: req.user._id,
-      readBy: { $ne: req.user._id }
+    const userId = req.user._id;
+    
+    // ✅ TÜM okunmamış mesajları say (genel, özel, grup)
+    const unreadCount = await Message.countDocuments({
+      readBy: { $ne: userId },
+      sender: { $ne: userId }
     });
 
-    // Grup mesajlarındaki okunmamış sayısı
-    const groups = await Group.find({ members: req.user._id });
+    // Özel mesajlardaki okunmamış sayısı (detay için)
+    const privateUnread = await Message.countDocuments({
+      receiver: userId,
+      readBy: { $ne: userId },
+      sender: { $ne: userId }
+    });
+
+    // Grup mesajlarındaki okunmamış sayısı (detay için)
+    const groups = await Group.find({ members: userId });
     const groupIds = groups.map(g => g._id);
     
     const groupUnread = await Message.countDocuments({
       group: { $in: groupIds },
-      readBy: { $ne: req.user._id },
-      sender: { $ne: req.user._id }
+      readBy: { $ne: userId },
+      sender: { $ne: userId }
     });
 
     res.json({
-      total: privateUnread + groupUnread,
+      total: unreadCount,
       private: privateUnread,
       group: groupUnread
     });
