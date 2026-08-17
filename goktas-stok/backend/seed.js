@@ -1,4 +1,4 @@
-// seed.js - DÜZELTİLMİŞ VERSİYON
+// seed.js - KESİN ÇÖZÜM (Premium Model B ve Standart Model A KALDIRILDI)
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const User = require('./models/User');
@@ -6,30 +6,31 @@ const Product = require('./models/Product');
 const Stock = require('./models/Stock');
 require('dotenv').config();
 
-// ⚠️ SADECE VERİTABANI BOŞSA ÇALIŞTIR
+// ⚠️ SADECE ADMIN KULLANICI YOKSA OLUŞTUR - HİÇBİR ÜRÜN EKLEME!
 const seedDatabase = async () => {
   try {
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/goktas-stok');
     console.log('✅ MongoDB bağlantısı başarılı');
 
-    // ✅ MEVCUT VERİLERİ KONTROL ET - SİLME!
-    const userCount = await User.countDocuments();
-    const productCount = await Product.countDocuments();
-    const stockCount = await Stock.countDocuments();
+    // ✅ Sadece admin kontrol et - Ürünleri ASLA EKLEME!
+    const adminExists = await User.findOne({ username: 'admin' });
 
-    console.log(`📊 Mevcut veriler: ${userCount} kullanıcı, ${productCount} ürün, ${stockCount} stok`);
-
-    // ✅ EĞER VERİ VARSA, SİLME!
-    if (userCount > 0 || productCount > 0 || stockCount > 0) {
-      console.log('⚠️ Veritabanında zaten veri var. Seed işlemi ATLANDI!');
-      console.log('💡 Veritabanını sıfırlamak istiyorsanız: npm run seed:force');
+    if (adminExists) {
+      console.log('✅ Admin kullanıcı zaten var. Seed işlemi ATLANDI!');
+      console.log('📊 Mevcut veriler:');
+      const userCount = await User.countDocuments();
+      const productCount = await Product.countDocuments();
+      const stockCount = await Stock.countDocuments();
+      console.log(`   👤 Kullanıcı: ${userCount}`);
+      console.log(`   📦 Ürün: ${productCount}`);
+      console.log(`   📦 Stok: ${stockCount}`);
       process.exit(0);
     }
 
-    // ✅ SADECE VERİ YOKSA EKLE
-    console.log('📝 Veritabanı boş, örnek veriler ekleniyor...');
-
-    // Admin kullanıcı oluştur
+    // ✅ Sadece admin oluştur - HİÇBİR ÜRÜN EKLEME!
+    console.log('📝 Admin kullanıcı oluşturuluyor...');
+    console.log('⚠️ HİÇBİR ÜRÜN EKLENMEYECEK! Ürünleri Admin Panelinden ekleyin.');
+    
     const adminPassword = await bcrypt.hash('admin123', 10);
     const admin = new User({
       username: 'admin',
@@ -42,21 +43,9 @@ const seedDatabase = async () => {
     await admin.save();
     console.log('✅ Admin kullanıcı oluşturuldu');
 
-    // Örnek ürünler
-    const products = [
-      { code: 'PR001', name: 'Standart Kanat', category: 'kanat', unit: 'adet' },
-      { code: 'PR002', name: 'Premium Kanat', category: 'kanat', unit: 'adet' },
-      { code: 'PR003', name: 'Bute Beyaz Kasa', category: 'kasa', unit: 'adet' },
-      { code: 'PR004', name: 'Koyu Gri Kasa', category: 'kasa', unit: 'adet' },
-    ];
-
-    for (const productData of products) {
-      const product = new Product(productData);
-      await product.save();
-      console.log(`✅ Ürün eklendi: ${product.name}`);
-    }
-
     console.log('✅ Seed işlemi tamamlandı!');
+    console.log('💡 Ürünleri Admin Panelinden ekleyin.');
+    console.log('💡 Premium Model B ve Standart Model A ASLA EKLENMEYECEK!');
     process.exit(0);
 
   } catch (error) {
@@ -77,7 +66,7 @@ const forceSeed = async () => {
     await Stock.deleteMany({});
     console.log('🗑️ Tüm veriler temizlendi');
     
-    // Sonra normal seed çalıştır
+    // Sonra normal seed çalıştır (sadece admin)
     await seedDatabase();
   } catch (error) {
     console.error('❌ Force seed hatası:', error);
