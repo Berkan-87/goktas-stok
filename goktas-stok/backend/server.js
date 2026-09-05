@@ -23,6 +23,7 @@ app.use('/api/production', require('./routes/production'));
 app.use('/api/messages', require('./routes/messages'));
 app.use('/api/groups', require('./routes/groups'));
 app.use('/api/users', require('./routes/users'));
+app.use('/api/announcements', require('./routes/announcements'));
 
 // ✅ SADECE EKSİK STOKLARI DÜZELT - VERİ SİLME YOK!
 const fixMissingStocks = async () => {

@@ -5,8 +5,8 @@ const { body, validationResult } = require('express-validator');
 const Stock = require('../models/Stock');
 const Product = require('../models/Product');
 const History = require('../models/History');
-const auth = require('../middleware/auth');
-const { canModifyBranch } = require('../middleware/authorize');
+const auth = require('../middleware/auth'); // ✅ DOĞRU
+const { canModifyBranch } = require('../middleware/authorize'); // ✅ DOĞRU
 
 // 📌 Tüm şubelerin stoklarını getir
 router.get('/', auth, async (req, res) => {

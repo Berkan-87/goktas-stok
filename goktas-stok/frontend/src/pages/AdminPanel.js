@@ -15,7 +15,10 @@ import {
   BuildingStorefrontIcon,
   TruckIcon,
   PackageIcon,
-  ClipboardDocumentListIcon
+  ClipboardDocumentListIcon,
+  MegaphoneIcon,
+  EyeIcon,
+  EyeSlashIcon
 } from '@heroicons/react/24/outline';
 
 const AdminPanel = () => {
@@ -26,6 +29,17 @@ const AdminPanel = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [stats, setStats] = useState({ total: 0, active: 0, inactive: 0 });
+
+  // ✅ Duyuru State'leri (YENİ)
+  const [announcements, setAnnouncements] = useState([]);
+  const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
+  const [newAnnouncement, setNewAnnouncement] = useState({
+    title: '',
+    content: '',
+    priority: 'medium',
+    expiresAt: ''
+  });
 
   // ✅ Kullanıcı Formu
   const [formData, setFormData] = useState({
@@ -72,7 +86,7 @@ const AdminPanel = () => {
     { value: 'viewer', label: '👁️ Görüntüleyici (Sadece görüntüleme)' }
   ];
 
-  // ✅ Üretim rolleri (GÜNCELLENDİ)
+  // ✅ Üretim rolleri
   const productionRoles = [
     { value: '', label: 'Yetkisi Yok' },
     { value: 'planlama', label: '📋 Planlama' },
@@ -97,6 +111,7 @@ const AdminPanel = () => {
       fetchUsers();
       fetchProducts();
       fetchStats();
+      fetchAnnouncements(); // ✅ Duyuruları da getir
     }
   }, [user]);
 
@@ -131,11 +146,21 @@ const AdminPanel = () => {
     }
   };
 
+  // ✅ Duyuruları getir (YENİ)
+  const fetchAnnouncements = async () => {
+    try {
+      const response = await axios.get('/announcements/all');
+      setAnnouncements(response.data);
+    } catch (error) {
+      console.error('❌ Duyurular alınamadı:', error);
+      toast.error('Duyurular alınamadı');
+    }
+  };
+
   // ✅ Kullanıcı işlemleri
   const handleUserSubmit = async (e) => {
     e.preventDefault();
     
-    // Validasyonlar
     if (!formData.username || !formData.name || !formData.role) {
       toast.error('Kullanıcı adı, isim ve rol zorunludur');
       return;
@@ -260,6 +285,54 @@ const AdminPanel = () => {
     });
   };
 
+  // ✅ DUYURU İŞLEMLERİ (YENİ)
+  const handleAddAnnouncement = async (e) => {
+    e.preventDefault();
+    
+    if (!newAnnouncement.title || !newAnnouncement.content) {
+      toast.error('Başlık ve içerik zorunludur');
+      return;
+    }
+
+    try {
+      if (editingAnnouncement) {
+        await axios.put(`/announcements/${editingAnnouncement._id}`, newAnnouncement);
+        toast.success('✅ Duyuru güncellendi');
+      } else {
+        await axios.post('/announcements', newAnnouncement);
+        toast.success('✅ Duyuru eklendi!');
+      }
+      setShowAnnouncementModal(false);
+      setEditingAnnouncement(null);
+      setNewAnnouncement({ title: '', content: '', priority: 'medium', expiresAt: '' });
+      fetchAnnouncements();
+    } catch (error) {
+      console.error('❌ Duyuru işlemi hatası:', error);
+      toast.error(error.response?.data?.message || 'İşlem başarısız');
+    }
+  };
+
+  const handleDeleteAnnouncement = async (id) => {
+    if (!window.confirm('Bu duyuruyu silmek istediğinize emin misiniz?')) return;
+    try {
+      await axios.delete(`/announcements/${id}`);
+      toast.success('✅ Duyuru silindi');
+      fetchAnnouncements();
+    } catch (error) {
+      toast.error('Duyuru silinemedi');
+    }
+  };
+
+  const handleToggleAnnouncementStatus = async (id, currentStatus) => {
+    try {
+      await axios.put(`/announcements/${id}`, { isActive: !currentStatus });
+      toast.success(`Duyuru ${!currentStatus ? 'aktifleştirildi' : 'pasifleştirildi'}`);
+      fetchAnnouncements();
+    } catch (error) {
+      toast.error('Durum güncellenemedi');
+    }
+  };
+
   // ✅ Yardımcı fonksiyonlar
   const getRoleLabel = (role) => {
     const labels = {
@@ -303,13 +376,31 @@ const AdminPanel = () => {
     return user.role === 'production_manager' && user.productionRole;
   };
 
+  const getPriorityBadge = (priority) => {
+    const badges = {
+      high: 'bg-red-100 text-red-700',
+      medium: 'bg-yellow-100 text-yellow-700',
+      low: 'bg-blue-100 text-blue-700'
+    };
+    return badges[priority] || badges.medium;
+  };
+
+  const getPriorityLabel = (priority) => {
+    const labels = {
+      high: '🔴 Yüksek',
+      medium: '🟡 Orta',
+      low: '🔵 Düşük'
+    };
+    return labels[priority] || labels.medium;
+  };
+
   return (
     <div className="space-y-6">
       {/* Başlık */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">⚙️ Admin Paneli</h1>
-          <p className="text-gray-600 mt-1">Kullanıcı, yetki ve ürün yönetimi</p>
+          <p className="text-gray-600 mt-1">Kullanıcı, yetki, ürün ve duyuru yönetimi</p>
         </div>
         {activeTab === 'users' && (
           <button
@@ -322,6 +413,19 @@ const AdminPanel = () => {
           >
             <UserPlusIcon className="h-5 w-5" />
             Yeni Kullanıcı
+          </button>
+        )}
+        {activeTab === 'announcements' && (
+          <button
+            onClick={() => {
+              setEditingAnnouncement(null);
+              setNewAnnouncement({ title: '', content: '', priority: 'medium', expiresAt: '' });
+              setShowAnnouncementModal(true);
+            }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <MegaphoneIcon className="h-5 w-5" />
+            Yeni Duyuru
           </button>
         )}
       </div>
@@ -391,6 +495,20 @@ const AdminPanel = () => {
           📦 Ürün Yönetimi
           <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
             {products.length}
+          </span>
+        </button>
+        {/* ✅ YENİ SEKMESİ: Duyuru Yönetimi */}
+        <button
+          onClick={() => setActiveTab('announcements')}
+          className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap ${
+            activeTab === 'announcements'
+              ? 'text-purple-600 border-b-2 border-purple-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          📢 Duyuru Yönetimi
+          <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+            {announcements.length}
           </span>
         </button>
       </div>
@@ -681,6 +799,84 @@ const AdminPanel = () => {
         </>
       )}
 
+      {/* ✅ DUYURU YÖNETİMİ SEKMESİ (YENİ) */}
+      {activeTab === 'announcements' && (
+        <div className="space-y-4">
+          {announcements.length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl shadow">
+              <div className="text-4xl mb-2">📢</div>
+              <p className="text-lg text-gray-500">Henüz duyuru yok</p>
+              <p className="text-sm text-gray-400 mt-1">
+                "Yeni Duyuru" butonunu kullanarak ilk duyuruyu ekleyin.
+              </p>
+            </div>
+          ) : (
+            announcements.map((ann) => (
+              <div key={ann._id} className="bg-white rounded-xl shadow p-4 border border-gray-100 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-gray-900">{ann.title}</h3>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${getPriorityBadge(ann.priority)}`}>
+                        {getPriorityLabel(ann.priority)}
+                      </span>
+                      {!ann.isActive && (
+                        <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                          Pasif
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1 whitespace-pre-line">{ann.content}</p>
+                    <div className="flex items-center gap-4 mt-2 text-xs text-gray-400 flex-wrap">
+                      <span>👤 {ann.createdBy?.name || 'Bilinmiyor'}</span>
+                      <span>📅 {new Date(ann.createdAt).toLocaleDateString('tr-TR')}</span>
+                      {ann.expiresAt && (
+                        <span>⏳ Son: {new Date(ann.expiresAt).toLocaleDateString('tr-TR')}</span>
+                      )}
+                      <span className={`px-2 py-0.5 rounded-full ${ann.isActive ? 'bg-green-50 text-green-600' : 'bg-gray-50 text-gray-500'}`}>
+                        {ann.isActive ? '✅ Aktif' : '❌ Pasif'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0 ml-4">
+                    <button
+                      onClick={() => {
+                        setEditingAnnouncement(ann);
+                        setNewAnnouncement({
+                          title: ann.title,
+                          content: ann.content,
+                          priority: ann.priority || 'medium',
+                          expiresAt: ann.expiresAt ? ann.expiresAt.split('T')[0] : ''
+                        });
+                        setShowAnnouncementModal(true);
+                      }}
+                      className="text-blue-500 hover:text-blue-700"
+                      title="Düzenle"
+                    >
+                      <PencilIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleToggleAnnouncementStatus(ann._id, ann.isActive)}
+                      className={`${ann.isActive ? 'text-yellow-500 hover:text-yellow-700' : 'text-green-500 hover:text-green-700'}`}
+                      title={ann.isActive ? 'Pasifleştir' : 'Aktifleştir'}
+                    >
+                      {ann.isActive ? <EyeSlashIcon className="h-4 w-4" /> : <EyeIcon className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={() => handleDeleteAnnouncement(ann._id)}
+                      className="text-red-500 hover:text-red-700"
+                      title="Sil"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {/* Kullanıcı Modalı */}
       {showUserModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -814,6 +1010,96 @@ const AdminPanel = () => {
                   onClick={() => {
                     setShowUserModal(false);
                     setEditingUser(null);
+                  }}
+                  className="flex-1 btn-secondary"
+                >
+                  İptal
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ Duyuru Modalı (YENİ) */}
+      {showAnnouncementModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                {editingAnnouncement ? '✏️ Duyuru Düzenle' : '📢 Yeni Duyuru Ekle'}
+              </h2>
+              <button
+                onClick={() => {
+                  setShowAnnouncementModal(false);
+                  setEditingAnnouncement(null);
+                  setNewAnnouncement({ title: '', content: '', priority: 'medium', expiresAt: '' });
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddAnnouncement} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Başlık *</label>
+                <input
+                  type="text"
+                  value={newAnnouncement.title}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, title: e.target.value })}
+                  className="input-field"
+                  placeholder="Duyuru başlığı"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">İçerik *</label>
+                <textarea
+                  value={newAnnouncement.content}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, content: e.target.value })}
+                  className="input-field"
+                  rows="4"
+                  placeholder="Duyuru içeriği..."
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Öncelik</label>
+                <select
+                  value={newAnnouncement.priority}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, priority: e.target.value })}
+                  className="input-field"
+                >
+                  <option value="low">🔵 Düşük</option>
+                  <option value="medium">🟡 Orta</option>
+                  <option value="high">🔴 Yüksek</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Son Kullanma Tarihi</label>
+                <input
+                  type="date"
+                  value={newAnnouncement.expiresAt}
+                  onChange={(e) => setNewAnnouncement({ ...newAnnouncement, expiresAt: e.target.value })}
+                  className="input-field"
+                />
+                <p className="text-xs text-gray-400 mt-1">Boş bırakırsanız süresiz olur.</p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button type="submit" className="flex-1 btn-primary">
+                  {editingAnnouncement ? 'Güncelle' : 'Ekle'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAnnouncementModal(false);
+                    setEditingAnnouncement(null);
+                    setNewAnnouncement({ title: '', content: '', priority: 'medium', expiresAt: '' });
                   }}
                   className="flex-1 btn-secondary"
                 >

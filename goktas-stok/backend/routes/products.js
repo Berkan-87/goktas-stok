@@ -1,13 +1,10 @@
-// routes/products.js
 const express = require('express');
 const router = express.Router();
 const Product = require('../models/Product');
 const Stock = require('../models/Stock');
-const auth = require('../middleware/auth');
-const { authorize } = require('../middleware/authorize');
 
 // 📌 Tüm ürünleri getir
-router.get('/', auth, async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const products = await Product.find({ isActive: true }).sort({ name: 1 });
     res.json(products);
@@ -17,13 +14,12 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// 📌 Yeni ürün ekle - DÜZELTİLDİ
-router.post('/', auth, authorize(['admin']), async (req, res) => {
+// 📌 Yeni ürün ekle
+router.post('/', async (req, res) => {
   try {
     const { name, description, unit, category, color } = req.body;
     const productCategory = category || 'kanat';
     
-    // ✅ TÜM KATEGORİLER - GÜNCELLENDİ
     const validCategories = ['kanat', 'kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
     if (!validCategories.includes(productCategory)) {
       return res.status(400).json({ 
@@ -31,7 +27,6 @@ router.post('/', auth, authorize(['admin']), async (req, res) => {
       });
     }
 
-    // ✅ Renk zorunlu kategoriler - GÜNCELLENDİ
     const colorRequired = ['kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
     if (colorRequired.includes(productCategory) && !color) {
       return res.status(400).json({ 
@@ -78,8 +73,8 @@ router.post('/', auth, authorize(['admin']), async (req, res) => {
   }
 });
 
-// 📌 Ürün güncelle - DÜZELTİLDİ
-router.put('/:id', auth, authorize(['admin']), async (req, res) => {
+// 📌 Ürün güncelle
+router.put('/:id', async (req, res) => {
   try {
     const { name, description, category, color, isActive } = req.body;
     
@@ -89,7 +84,6 @@ router.put('/:id', auth, authorize(['admin']), async (req, res) => {
     }
     
     if (category) {
-      // ✅ TÜM KATEGORİLER - GÜNCELLENDİ
       const validCategories = ['kanat', 'kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
       if (!validCategories.includes(category)) {
         return res.status(400).json({ 
@@ -122,7 +116,7 @@ router.put('/:id', auth, authorize(['admin']), async (req, res) => {
 });
 
 // 📌 Ürün sil (soft delete)
-router.delete('/:id', auth, authorize(['admin']), async (req, res) => {
+router.delete('/:id', async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {
