@@ -17,22 +17,25 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
-// 📌 Yeni ürün ekle - ✅ DÜZELTİLDİ
+// 📌 Yeni ürün ekle - DÜZELTİLDİ
 router.post('/', auth, authorize(['admin']), async (req, res) => {
   try {
     const { name, description, unit, category, color } = req.body;
     const productCategory = category || 'kanat';
     
-    const validCategories = ['kanat', 'kasa', 'baslik'];
+    // ✅ TÜM KATEGORİLER - GÜNCELLENDİ
+    const validCategories = ['kanat', 'kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
     if (!validCategories.includes(productCategory)) {
       return res.status(400).json({ 
         message: `Geçersiz kategori. Geçerli kategoriler: ${validCategories.join(', ')}` 
       });
     }
 
-    if ((productCategory === 'kasa' || productCategory === 'baslik') && !color) {
+    // ✅ Renk zorunlu kategoriler - GÜNCELLENDİ
+    const colorRequired = ['kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
+    if (colorRequired.includes(productCategory) && !color) {
       return res.status(400).json({ 
-        message: 'Kasa ve Başlık kategorileri için renk seçimi zorunludur' 
+        message: 'Kasa, Başlık, Pervaz, Süpürgelik ve Cam Çıtası kategorileri için renk seçimi zorunludur' 
       });
     }
 
@@ -75,7 +78,7 @@ router.post('/', auth, authorize(['admin']), async (req, res) => {
   }
 });
 
-// 📌 Ürün güncelle
+// 📌 Ürün güncelle - DÜZELTİLDİ
 router.put('/:id', auth, authorize(['admin']), async (req, res) => {
   try {
     const { name, description, category, color, isActive } = req.body;
@@ -86,7 +89,8 @@ router.put('/:id', auth, authorize(['admin']), async (req, res) => {
     }
     
     if (category) {
-      const validCategories = ['kanat', 'kasa', 'baslik'];
+      // ✅ TÜM KATEGORİLER - GÜNCELLENDİ
+      const validCategories = ['kanat', 'kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
       if (!validCategories.includes(category)) {
         return res.status(400).json({ 
           message: `Geçersiz kategori. Geçerli kategoriler: ${validCategories.join(', ')}` 
