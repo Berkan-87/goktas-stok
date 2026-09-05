@@ -168,12 +168,16 @@ const Dashboard = () => {
 
   // Diğer fonksiyonlar (export, fetchDashboardData, vs.) aynen kalıyor
   const handleExportExcel = () => {
-    if (modelOutgoingData.length === 0) {
+    // ✅ topOutgoingModels kullan - varyantları içerir
+    if (topOutgoingModels.length === 0) {
       toast.error('Export yapılacak veri bulunamadı!');
       return;
     }
-    const data = prepareModelOutgoingData(modelOutgoingData);
-    const success = exportToExcel(data, `ModelBazliCikisRaporu_${new Date().toISOString().split('T')[0]}`);
+    const data = prepareModelOutgoingData(topOutgoingModels);
+    const success = exportToExcel(
+      data, 
+      `EnCokCikisYapanModeller_${new Date().toISOString().split('T')[0]}`
+    );
     if (success) {
       toast.success('Excel raporu başarıyla indirildi! 📊');
     } else {
@@ -182,26 +186,32 @@ const Dashboard = () => {
   };
 
   const handleExportAll = () => {
-    if (modelOutgoingData.length === 0 && branchStockData.length === 0 && lowStockItems.length === 0) {
+    if (topOutgoingModels.length === 0 && branchStockData.length === 0 && lowStockItems.length === 0) {
       toast.error('Export yapılacak veri bulunamadı!');
       return;
     }
+    
     let exportCount = 0;
-    if (modelOutgoingData.length > 0) {
-      const modelData = prepareModelOutgoingData(modelOutgoingData);
-      exportToExcel(modelData, `ModelBazliCikis_${new Date().toISOString().split('T')[0]}`);
+    
+    // ✅ topOutgoingModels kullan
+    if (topOutgoingModels.length > 0) {
+      const modelData = prepareModelOutgoingData(topOutgoingModels);
+      exportToExcel(modelData, `EnCokCikisYapanModeller_${new Date().toISOString().split('T')[0]}`);
       exportCount++;
     }
+    
     if (branchStockData.length > 0) {
       const branchData = prepareBranchStockData(branchStockData);
       exportToExcel(branchData, `SubeBazliStok_${new Date().toISOString().split('T')[0]}`);
       exportCount++;
     }
+    
     if (lowStockItems.length > 0) {
       const lowStockData = prepareLowStockData(lowStockItems);
       exportToExcel(lowStockData, `DusukStokUyarilari_${new Date().toISOString().split('T')[0]}`);
       exportCount++;
     }
+    
     toast.success(`${exportCount} rapor Excel olarak indirildi! 📦`);
   };
 

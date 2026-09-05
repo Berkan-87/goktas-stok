@@ -78,7 +78,7 @@ export const exportToExcel = (data, filename, sheetName = 'Rapor') => {
 };
 
 // ============================
-// 📄 PDF EXPORT
+// 📄 PDF EXPORT (Opsiyonel)
 // ============================
 export const exportToPDF = (data, filename, title, columns) => {
   try {
