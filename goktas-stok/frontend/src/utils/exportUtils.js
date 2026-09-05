@@ -138,14 +138,10 @@ const cleanModelName = (name) => {
 
 /**
  * Model bazlı çıkış verilerini hazırlar
- * - Ekrandaki model sıralamasını korur (data'daki ilk görülme sırası)
- * - Aynı modelin varyantlarını alt alta gruplar
- * - Varyantları 77 → 87 → Camlı sırasıyla düzenler
  */
 export const prepareModelOutgoingData = (data) => {
   if (!data || data.length === 0) return [];
 
-  // 1️⃣ Veriyi modele göre grupla (varyantları topla)
   const modelMap = new Map();
   const modelOrder = [];
 
@@ -170,7 +166,6 @@ export const prepareModelOutgoingData = (data) => {
     });
   });
 
-  // 2️⃣ Varyantları sırala (77 → 87 → Camlı)
   const variantOrder = (name) => {
     if (name.includes('77')) return 1;
     if (name.includes('87')) return 2;
@@ -196,7 +191,7 @@ export const prepareModelOutgoingData = (data) => {
 };
 
 /**
- * Şube bazlı stok verilerini hazırlar (stok miktarına göre azalan)
+ * Şube bazlı stok verilerini hazırlar
  */
 export const prepareBranchStockData = (data) => {
   if (!data || data.length === 0) return [];
@@ -209,7 +204,7 @@ export const prepareBranchStockData = (data) => {
 };
 
 /**
- * Düşük stok verilerini hazırlar (kalan stoğa göre artan)
+ * Düşük stok verilerini hazırlar
  */
 export const prepareLowStockData = (data) => {
   if (!data || data.length === 0) return [];
@@ -221,4 +216,145 @@ export const prepareLowStockData = (data) => {
     'Kritik Seviye': item.criticalLevel || 50,
     Durum: item.quantity <= 10 ? 'Kritik' : item.quantity <= 25 ? 'Uyarı' : 'Düşük'
   }));
+};
+
+// ============================
+// 🆕 KATEGORİ BAZLI STOK EXPORT (GRUPLAMALI, TÜM STOKLAR)
+// ============================
+
+/**
+ * Kategoriye göre stok verilerini hazırlar (sayfadaki gruplama düzeniyle)
+ * @param {Array} stocks - Tüm stok verileri (0 olanlar dahil)
+ * @param {string} category - Kategori id (kanat, kasa, baslik, pervaz, supurgelik, cam_citasi)
+ * @param {Array} products - Tüm ürünler
+ * @param {Array} colors - Renk listesi (label, id, emoji, color, textColor)
+ * @param {Array} branches - Şube listesi (value, label)
+ * @returns {Array} Excel için hazır veri
+ */
+export const prepareCategoryStockData = (stocks, category, products, colors, branches) => {
+  if (!stocks || stocks.length === 0) return [];
+  
+  // Kategoriye göre ürünleri filtrele
+  const categoryProducts = products.filter(p => p.category === category);
+  if (categoryProducts.length === 0) return [];
+
+  // Stok verilerini ürün ID'ye göre map'le
+  const stockMap = {};
+  stocks.forEach(s => {
+    if (s.productId?._id) {
+      stockMap[s.productId._id] = s;
+    }
+  });
+
+  const getStock = (productId) => {
+    const stock = stockMap[productId];
+    return stock ? stock.quantity : 0;
+  };
+
+  const getStatus = (quantity) => {
+    if (quantity <= 0) return '📭 Tükendi';
+    if (quantity <= 10) return '🔴 Kritik';
+    if (quantity <= 25) return '🟠 Uyarı';
+    if (quantity <= 50) return '🟡 Düşük';
+    return '🟢 Yeterli';
+  };
+
+  // ✅ Kanat için model bazlı gruplama (varyantlar alt alta, sayfadaki sırayla)
+  if (category === 'kanat') {
+    const groups = {};
+    categoryProducts.forEach(product => {
+      const modelName = product.name.replace(/\s*(87|77|Camlı|Camli|Cam)\s*$/i, '').trim();
+      if (!groups[modelName]) {
+        groups[modelName] = [];
+      }
+      groups[modelName].push(product);
+    });
+
+    // Model sıralamasını ürünlerin ilk görülme sırasına göre koru
+    const modelOrder = [];
+    const groupMap = {};
+    categoryProducts.forEach(product => {
+      const modelName = product.name.replace(/\s*(87|77|Camlı|Camli|Cam)\s*$/i, '').trim();
+      if (!groupMap[modelName]) {
+        groupMap[modelName] = true;
+        modelOrder.push(modelName);
+      }
+    });
+
+    const result = [];
+    modelOrder.forEach(modelName => {
+      const productsInGroup = groups[modelName] || [];
+      // Varyantları 77 → 87 → Camlı sırasıyla sırala
+      const variantOrder = (name) => {
+        if (name.includes('77')) return 1;
+        if (name.includes('87')) return 2;
+        if (name.includes('Camlı') || name.includes('Camli') || name.includes('Cam')) return 3;
+        return 4;
+      };
+      productsInGroup.sort((a, b) => variantOrder(a.name) - variantOrder(b.name));
+      
+      productsInGroup.forEach(product => {
+        const quantity = getStock(product._id);
+        result.push({
+          'Grup': modelName,
+          'Ürün Adı': product.name,
+          'Renk': '-',
+          'Stok Miktarı': quantity,
+          'Durum': getStatus(quantity)
+        });
+      });
+    });
+    return result;
+  }
+
+  // ✅ Diğer kategoriler için renk bazlı gruplama
+  const colorGroups = {};
+  colors.forEach(color => {
+    colorGroups[color.label] = [];
+  });
+  colorGroups['Diğer'] = [];
+
+  categoryProducts.forEach(product => {
+    const colorId = product.color;
+    const color = colors.find(c => c.id === colorId);
+    if (color && colorGroups[color.label]) {
+      colorGroups[color.label].push(product);
+    } else {
+      colorGroups['Diğer'].push(product);
+    }
+  });
+
+  // Renk sırasına göre düzenle
+  const orderedGroups = {};
+  colors.forEach(color => {
+    if (colorGroups[color.label] && colorGroups[color.label].length > 0) {
+      orderedGroups[color.label] = colorGroups[color.label];
+    }
+  });
+  if (colorGroups['Diğer'] && colorGroups['Diğer'].length > 0) {
+    orderedGroups['Diğer'] = colorGroups['Diğer'];
+  }
+
+  const result = [];
+  Object.keys(orderedGroups).forEach(colorLabel => {
+    const productsInGroup = orderedGroups[colorLabel];
+    // Ürünleri alfabetik sırala
+    productsInGroup.sort((a, b) => a.name.localeCompare(b.name));
+    
+    productsInGroup.forEach(product => {
+      const quantity = getStock(product._id);
+      const colorId = product.color;
+      const colorInfo = colors.find(c => c.id === colorId);
+      const colorName = colorInfo ? colorInfo.label : (colorId || '-');
+      result.push({
+        'Grup': colorLabel,
+        'Ürün Adı': product.name,
+        'Renk': colorName,
+        'Stok Miktarı': quantity,
+        'Durum': getStatus(quantity)
+      });
+    });
+  });
+
+  return result;
 };

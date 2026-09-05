@@ -1,3 +1,4 @@
+// frontend/src/pages/StockList.js
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import toast from 'react-hot-toast';
@@ -14,7 +15,7 @@ import {
   ChevronRightIcon,
   TableCellsIcon
 } from '@heroicons/react/24/outline';
-import { exportToExcel } from '../utils/exportUtils';
+import { exportToExcel, prepareCategoryStockData } from '../utils/exportUtils';
 
 const StockList = () => {
   const { user } = useSelector((state) => state.auth);
@@ -47,7 +48,6 @@ const StockList = () => {
     { value: 'karsiyaka', label: '🏖️ Karşıyaka' }
   ];
 
-  // ✅ KATEGORİLER - 3 YENİ EKLENDİ
   const categories = [
     { id: 'kanat', label: '🚪 Kanat', icon: '🚪' },
     { id: 'kasa', label: '🪟 Kasa Takım', icon: '🪟' },
@@ -79,15 +79,12 @@ const StockList = () => {
     }
   };
 
-  // ✅ EXPORT - SADECE STOK > 0 OLANLAR (PDF KALDIRILDI)
   const handleExportExcel = () => {
     const filteredStocks = stocks.filter(s => s.quantity > 0);
-    
     if (filteredStocks.length === 0) {
       toast.error('Export yapılacak veri bulunamadı!');
       return;
     }
-
     const exportData = filteredStocks.map(stock => ({
       'Ürün Adı': stock.productId?.name || '-',
       'Kategori': getCategoryLabel(stock.productId?.category) || '-',
@@ -100,10 +97,8 @@ const StockList = () => {
                stock.quantity <= 50 ? '🟡 Düşük' : '🟢 Yeterli',
       'Son Güncelleme': stock.updatedAt ? new Date(stock.updatedAt).toLocaleString('tr-TR') : '-'
     }));
-
     const filename = `TumStoklar_${branches.find(b => b.value === selectedBranch)?.label}_${new Date().toISOString().split('T')[0]}`;
     const success = exportToExcel(exportData, filename);
-    
     if (success) {
       toast.success(`📊 ${exportData.length} stok kaydı Excel olarak indirildi!`);
     } else {
@@ -112,42 +107,37 @@ const StockList = () => {
     setExportDropdownOpen(false);
   };
 
-  // ✅ Kategori etiketini bul
   const getCategoryLabel = (categoryId) => {
     const cat = categories.find(c => c.id === categoryId);
     return cat ? cat.label : categoryId;
   };
 
-  // ✅ Kategori bazlı export
   const handleExportFiltered = (category) => {
-    const filteredStocks = stocks.filter(s => 
-      s.productId?.category === category && s.quantity > 0
-    );
-    
-    if (filteredStocks.length === 0) {
-      const categoryName = categories.find(c => c.id === category)?.label || category;
-      toast.error(`${categoryName} kategorisinde stok bulunamadı!`);
+    const categoryProducts = products.filter(p => p.category === category);
+    if (categoryProducts.length === 0) {
+      toast.error('Bu kategoride ürün bulunmuyor!');
       return;
     }
-
-    const exportData = filteredStocks.map(stock => ({
-      'Ürün Adı': stock.productId?.name || '-',
-      'Kategori': getCategoryLabel(stock.productId?.category) || '-',
-      'Renk': stock.productId?.color ? colors.find(c => c.id === stock.productId.color)?.label || '-' : '-',
-      'Şube': branches.find(b => b.value === stock.branch)?.label || stock.branch,
-      'Miktar': stock.quantity,
-      'Kritik Seviye': stock.criticalLevel || 50,
-      'Durum': stock.quantity <= 10 ? '🔴 Kritik' : 
-               stock.quantity <= 25 ? '🟠 Uyarı' : 
-               stock.quantity <= 50 ? '🟡 Düşük' : '🟢 Yeterli'
-    }));
-
-    const filename = `${category}_Stoklari_${branches.find(b => b.value === selectedBranch)?.label}_${new Date().toISOString().split('T')[0]}`;
+    if (stocks.length === 0) {
+      toast.error('Stok verisi bulunamadı!');
+      return;
+    }
+    const exportData = prepareCategoryStockData(
+      stocks,
+      category,
+      products,
+      colors,
+      branches
+    );
+    if (exportData.length === 0) {
+      toast.error('Export yapılacak veri bulunamadı!');
+      return;
+    }
+    const categoryName = getCategoryLabel(category);
+    const filename = `${categoryName}_Stoklari_${branches.find(b => b.value === selectedBranch)?.label}_${new Date().toISOString().split('T')[0]}`;
     const success = exportToExcel(exportData, filename);
-    
     if (success) {
-      const categoryName = categories.find(c => c.id === category)?.label || category;
-      toast.success(`📊 ${exportData.length} ${categoryName} stok kaydı indirildi!`);
+      toast.success(`📊 ${exportData.length} ${categoryName} stok kaydı gruplamalı olarak indirildi!`);
     } else {
       toast.error('Export başarısız!');
     }
@@ -165,7 +155,6 @@ const StockList = () => {
       toast.error('Geçerli bir miktar giriniz');
       return;
     }
-
     try {
       const endpoint = type === 'in' ? '/stock/in' : '/stock/out';
       await axios.post(endpoint, {
@@ -188,16 +177,13 @@ const StockList = () => {
       toast.error('Ürün adı zorunludur');
       return;
     }
-
-    // Kasa, Başlık, Pervaz, Süpürgelik, Cam Çıtası için renk zorunlu
     const colorRequired = ['kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
     if (colorRequired.includes(newProduct.category) && !newProduct.color) {
       toast.error('Bu kategori için renk seçmelisiniz');
       return;
     }
-
     try {
-      const response = await axios.post('/products', {
+      await axios.post('/products', {
         name: newProduct.name,
         description: newProduct.description,
         unit: 'adet',
@@ -233,11 +219,9 @@ const StockList = () => {
         description: editForm.description,
         category: editForm.category || editingProduct.category
       };
-      
       if (editForm.color) {
         updateData.color = editForm.color;
       }
-      
       await axios.put(`/products/${editingProduct._id}`, updateData);
       toast.success('Ürün başarıyla güncellendi');
       setEditingProduct(null);
@@ -273,29 +257,15 @@ const StockList = () => {
   };
 
   const getProductColor = (product) => {
-    if (product.color) {
-      return product.color;
-    }
-    
+    if (product.color) return product.color;
     const name = product.name.toUpperCase();
-    
-    if (name.includes('TAŞ') || name.includes('TAS') || name.includes('TG')) {
-      return 'tas_gri';
-    }
-    if (name.includes('KOYU') || name.includes('KG')) {
-      return 'koyu_gri';
-    }
-    if (name.includes('AÇIK') || name.includes('ACIK') || name.includes('AG')) {
-      return 'acik_gri';
-    }
-    if (name.includes('BUTE') || name.includes('BEYAZ') || name.includes('BB')) {
-      return 'bute_beyaz';
-    }
-    
+    if (name.includes('TAŞ') || name.includes('TAS') || name.includes('TG')) return 'tas_gri';
+    if (name.includes('KOYU') || name.includes('KG')) return 'koyu_gri';
+    if (name.includes('AÇIK') || name.includes('ACIK') || name.includes('AG')) return 'acik_gri';
+    if (name.includes('BUTE') || name.includes('BEYAZ') || name.includes('BB')) return 'bute_beyaz';
     return null;
   };
 
-  // ✅ Kategoriye göre gruplama (Kanat - Model bazlı)
   const groupProductsByModel = (category) => {
     const filteredProducts = products.filter(p => p.category === category);
     const groups = {};
@@ -309,18 +279,14 @@ const StockList = () => {
     return groups;
   };
 
-  // ✅ Renk bazlı gruplama (Kasa, Başlık, Pervaz, Süpürgelik, Cam Çıtası)
   const groupProductsByColor = (category) => {
     const filteredProducts = products.filter(p => p.category === category);
     const groups = {};
-    
     colors.forEach(color => {
       groups[color.label] = [];
     });
-
     filteredProducts.forEach(product => {
       const colorId = getProductColor(product);
-      
       if (colorId) {
         const color = colors.find(c => c.id === colorId);
         if (color && groups[color.label]) {
@@ -328,20 +294,17 @@ const StockList = () => {
           return;
         }
       }
-      
       if (!groups['Diğer']) {
         groups['Diğer'] = [];
       }
       groups['Diğer'].push(product);
     });
-
     const result = {};
     Object.keys(groups).forEach(key => {
       if (groups[key].length > 0) {
         result[key] = groups[key];
       }
     });
-    
     return result;
   };
 
@@ -352,11 +315,9 @@ const StockList = () => {
     }));
   };
 
-  // ✅ Kategori Kartı (Kanat - Model bazlı)
   const KanatGroupCard = ({ groupName, products: groupProducts }) => {
     const isExpanded = expandedGroups[groupName] !== false;
     const totalStock = groupProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
-
     return (
       <div className="bg-white rounded-xl shadow-md overflow-hidden border-l-4 border-blue-500 hover:shadow-lg transition-shadow duration-300">
         <div 
@@ -368,24 +329,18 @@ const StockList = () => {
               {isExpanded ? <ChevronDownIcon className="h-5 w-5" /> : <ChevronRightIcon className="h-5 w-5" />}
             </button>
             <div>
-              <h3 className="font-bold text-gray-900 text-lg">
-                🚪 {groupName}
-              </h3>
-              <p className="text-sm text-gray-500">
-                {groupProducts.length} varyant • Toplam: {totalStock} adet
-              </p>
+              <h3 className="font-bold text-gray-900 text-lg">🚪 {groupName}</h3>
+              <p className="text-sm text-gray-500">{groupProducts.length} varyant • Toplam: {totalStock} adet</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700">
               {totalStock > 500 ? '🟢 Yüksek' :
                totalStock > 200 ? '🟡 Orta' :
-               totalStock > 50 ? '🟠 Düşük' :
-               '🔴 Kritik'}
+               totalStock > 50 ? '🟠 Düşük' : '🔴 Kritik'}
             </span>
           </div>
         </div>
-
         {isExpanded && (
           <div className="p-4 bg-blue-50">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -397,14 +352,12 @@ const StockList = () => {
     );
   };
 
-  // ✅ Renk Kartı (Kasa, Başlık, Pervaz, Süpürgelik, Cam Çıtası)
   const ColorCard = ({ colorLabel, products: colorProducts, category }) => {
     const isExpanded = expandedGroups[colorLabel] !== false;
     const totalStock = colorProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
     const colorInfo = colors.find(c => c.label === colorLabel);
     const isOther = colorLabel === 'Diğer';
     const isAcikGri = colorLabel === 'Açık Gri';
-    
     const categoryEmoji = categories.find(c => c.id === category)?.icon || '📦';
     const borderColors = {
       kasa: 'border-purple-500',
@@ -427,7 +380,6 @@ const StockList = () => {
       supurgelik: 'bg-yellow-100 text-yellow-700',
       cam_citasi: 'bg-pink-100 text-pink-700'
     };
-
     return (
       <div className={`bg-white rounded-xl shadow-md overflow-hidden border-l-4 ${borderColors[category] || 'border-gray-500'} hover:shadow-lg transition-shadow duration-300`}>
         <div 
@@ -475,12 +427,10 @@ const StockList = () => {
               {totalStock > 500 ? '🟢 Yüksek' :
                totalStock > 200 ? '🟡 Orta' :
                totalStock > 50 ? '🟠 Düşük' :
-               totalStock > 0 ? '🔴 Kritik' :
-               '📭 Boş'}
+               totalStock > 0 ? '🔴 Kritik' : '📭 Boş'}
             </span>
           </div>
         </div>
-
         {isExpanded && (
           <div className={`p-4 ${bgColors[category]?.replace('from-', 'bg-').replace(' to-', '') || 'bg-gray-50'}`}>
             {colorProducts.length > 0 ? (
@@ -488,9 +438,7 @@ const StockList = () => {
                 {colorProducts.map(product => renderProductCard(product))}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-400">
-                Bu renkte henüz ürün bulunmuyor
-              </div>
+              <div className="text-center py-8 text-gray-400">Bu renkte henüz ürün bulunmuyor</div>
             )}
           </div>
         )}
@@ -662,7 +610,6 @@ const StockList = () => {
     );
   };
 
-  // ✅ Kategorilere göre ürünleri grupla
   const kanatGroups = groupProductsByModel('kanat');
   const kasaGroups = groupProductsByColor('kasa');
   const baslikGroups = groupProductsByColor('baslik');
@@ -670,7 +617,6 @@ const StockList = () => {
   const supurgelikGroups = groupProductsByColor('supurgelik');
   const camCitasiGroups = groupProductsByColor('cam_citasi');
 
-  // ✅ Renk sırasına göre düzenle
   const orderGroups = (groups) => {
     const ordered = {};
     colors.forEach(color => {
@@ -690,7 +636,6 @@ const StockList = () => {
   const orderedSupurgelikGroups = orderGroups(supurgelikGroups);
   const orderedCamCitasiGroups = orderGroups(camCitasiGroups);
 
-  // ✅ Kategori sayıları
   const categoryCounts = {
     kanat: products.filter(p => p.category === 'kanat').length,
     kasa: products.filter(p => p.category === 'kasa').length,
@@ -720,6 +665,7 @@ const StockList = () => {
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-1 sm:gap-2">
+            {/* ✅ Sadece 2 buton: Excel (tüm stoklar) ve Kategori Export */}
             <button
               onClick={handleExportExcel}
               className="btn-secondary flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -786,7 +732,7 @@ const StockList = () => {
         </div>
       </div>
 
-      {/* ✅ Kategori Sekmeleri - 6 KATEGORİ */}
+      {/* Kategori Sekmeleri (devamı) – aynen kalır */}
       <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1">
         {categories.map(cat => (
           <button
@@ -806,7 +752,7 @@ const StockList = () => {
         ))}
       </div>
 
-      {/* ✅ Kategori İçeriği */}
+      {/* Kategori içerikleri (aynen) */}
       <div className="space-y-4">
         {activeTab === 'kanat' && (
           Object.keys(kanatGroups).length === 0 ? (
@@ -816,15 +762,11 @@ const StockList = () => {
             </div>
           ) : (
             Object.entries(kanatGroups).map(([groupName, groupProducts]) => (
-              <KanatGroupCard 
-                key={groupName} 
-                groupName={groupName} 
-                products={groupProducts} 
-              />
+              <KanatGroupCard key={groupName} groupName={groupName} products={groupProducts} />
             ))
           )
         )}
-
+        {/* diğer kategoriler – aynen devam */}
         {activeTab === 'kasa' && (
           Object.keys(orderedKasaGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
@@ -833,16 +775,10 @@ const StockList = () => {
             </div>
           ) : (
             Object.entries(orderedKasaGroups).map(([colorLabel, colorProducts]) => (
-              <ColorCard 
-                key={colorLabel} 
-                colorLabel={colorLabel} 
-                products={colorProducts} 
-                category="kasa"
-              />
+              <ColorCard key={colorLabel} colorLabel={colorLabel} products={colorProducts} category="kasa" />
             ))
           )
         )}
-
         {activeTab === 'baslik' && (
           Object.keys(orderedBaslikGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
@@ -851,16 +787,10 @@ const StockList = () => {
             </div>
           ) : (
             Object.entries(orderedBaslikGroups).map(([colorLabel, colorProducts]) => (
-              <ColorCard 
-                key={colorLabel} 
-                colorLabel={colorLabel} 
-                products={colorProducts} 
-                category="baslik"
-              />
+              <ColorCard key={colorLabel} colorLabel={colorLabel} products={colorProducts} category="baslik" />
             ))
           )
         )}
-
         {activeTab === 'pervaz' && (
           Object.keys(orderedPervazGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
@@ -869,16 +799,10 @@ const StockList = () => {
             </div>
           ) : (
             Object.entries(orderedPervazGroups).map(([colorLabel, colorProducts]) => (
-              <ColorCard 
-                key={colorLabel} 
-                colorLabel={colorLabel} 
-                products={colorProducts} 
-                category="pervaz"
-              />
+              <ColorCard key={colorLabel} colorLabel={colorLabel} products={colorProducts} category="pervaz" />
             ))
           )
         )}
-
         {activeTab === 'supurgelik' && (
           Object.keys(orderedSupurgelikGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
@@ -887,16 +811,10 @@ const StockList = () => {
             </div>
           ) : (
             Object.entries(orderedSupurgelikGroups).map(([colorLabel, colorProducts]) => (
-              <ColorCard 
-                key={colorLabel} 
-                colorLabel={colorLabel} 
-                products={colorProducts} 
-                category="supurgelik"
-              />
+              <ColorCard key={colorLabel} colorLabel={colorLabel} products={colorProducts} category="supurgelik" />
             ))
           )
         )}
-
         {activeTab === 'cam_citasi' && (
           Object.keys(orderedCamCitasiGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
@@ -905,18 +823,13 @@ const StockList = () => {
             </div>
           ) : (
             Object.entries(orderedCamCitasiGroups).map(([colorLabel, colorProducts]) => (
-              <ColorCard 
-                key={colorLabel} 
-                colorLabel={colorLabel} 
-                products={colorProducts} 
-                category="cam_citasi"
-              />
+              <ColorCard key={colorLabel} colorLabel={colorLabel} products={colorProducts} category="cam_citasi" />
             ))
           )
         )}
       </div>
 
-      {/* Modal - Stok Giriş/Çıkış */}
+      {/* Modal – Stok Giriş/Çıkış (aynı) */}
       {modalData.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -957,7 +870,7 @@ const StockList = () => {
         </div>
       )}
 
-      {/* Modal - Silme Onay */}
+      {/* Modal – Silme Onayı (aynı) */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -970,22 +883,18 @@ const StockList = () => {
             <p className="text-gray-600 text-center mb-4 text-sm">
               <strong>{showDeleteConfirm.productName}</strong> ürününü stok listesinden çıkarmak istediğinize emin misiniz?
             </p>
-            <p className="text-sm text-red-600 text-center mb-6">
-              ⚠️ Bu işlem geri alınamaz!
-            </p>
+            <p className="text-sm text-red-600 text-center mb-6">⚠️ Bu işlem geri alınamaz!</p>
             <div className="flex flex-col sm:flex-row gap-3">
               <button onClick={handleDeleteProduct} className="flex-1 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700">
                 Evet, Çıkar
               </button>
-              <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 btn-secondary">
-                İptal
-              </button>
+              <button onClick={() => setShowDeleteConfirm(null)} className="flex-1 btn-secondary">İptal</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Modal - Yeni Ürün Ekle */}
+      {/* Modal – Yeni Ürün Ekle (aynı) */}
       {showAddProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto">
@@ -1058,9 +967,7 @@ const StockList = () => {
 
               <div className="flex flex-col sm:flex-row gap-3">
                 <button type="submit" className="flex-1 btn-primary">Ekle</button>
-                <button type="button" onClick={() => setShowAddProduct(false)} className="flex-1 btn-secondary">
-                  İptal
-                </button>
+                <button type="button" onClick={() => setShowAddProduct(false)} className="flex-1 btn-secondary">İptal</button>
               </div>
             </form>
           </div>
