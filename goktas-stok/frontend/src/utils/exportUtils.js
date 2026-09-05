@@ -145,32 +145,32 @@ const cleanModelName = (name) => {
 export const prepareModelOutgoingData = (data) => {
   if (!data || data.length === 0) return [];
 
-  const modelGroups = [];
-  const seenModels = new Set();
+  // 1️⃣ Veriyi modele göre grupla (varyantları topla)
+  const modelMap = new Map();
+  const modelOrder = [];
 
-  // 1️⃣ Veriyi dolaş, modelleri sırasıyla grupla
   data.forEach((item) => {
     const rawModel = item.model || 'Belirsiz';
     const clean = cleanModelName(rawModel);
-    if (!seenModels.has(clean)) {
-      seenModels.add(clean);
-      modelGroups.push({
+    
+    if (!modelMap.has(clean)) {
+      modelMap.set(clean, {
         modelKey: clean,
         variants: []
       });
+      modelOrder.push(clean);
     }
-    const group = modelGroups.find(g => g.modelKey === clean);
-    if (group) {
-      group.variants.push({
-        model: rawModel,
-        quantity: item.quantity || 0,
-        currentStock: item.currentStock || 0,
-        status: item.status || 'Belirsiz'
-      });
-    }
+    
+    const group = modelMap.get(clean);
+    group.variants.push({
+      model: rawModel,
+      quantity: item.quantity || 0,
+      currentStock: item.currentStock || 0,
+      status: item.status || 'Belirsiz'
+    });
   });
 
-  // 2️⃣ Her grup içinde varyantları sırala (77 → 87 → Camlı)
+  // 2️⃣ Varyantları sırala (77 → 87 → Camlı)
   const variantOrder = (name) => {
     if (name.includes('77')) return 1;
     if (name.includes('87')) return 2;
@@ -179,9 +179,10 @@ export const prepareModelOutgoingData = (data) => {
   };
 
   const result = [];
-  modelGroups.forEach(group => {
+  modelOrder.forEach((key) => {
+    const group = modelMap.get(key);
     group.variants.sort((a, b) => variantOrder(a.model) - variantOrder(b.model));
-    group.variants.forEach(variant => {
+    group.variants.forEach((variant) => {
       result.push({
         Model: variant.model,
         'Çıkış (Adet)': variant.quantity,
