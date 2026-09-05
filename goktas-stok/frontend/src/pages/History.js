@@ -9,10 +9,9 @@ import {
   ArrowUpIcon,
   ArrowDownIcon,
   ArrowRightIcon,
-  DocumentArrowDownIcon,
   TableCellsIcon
 } from '@heroicons/react/24/outline';
-import { exportToExcel, exportToPDF } from '../utils/exportUtils';
+import { exportToExcel } from '../utils/exportUtils';
 
 const History = () => {
   const { user } = useSelector((state) => state.auth);
@@ -61,6 +60,7 @@ const History = () => {
     }
   };
 
+  // ✅ Sadece Excel Export - PDF KALDIRILDI
   const handleExportExcel = () => {
     if (history.length === 0) {
       toast.error('Export yapılacak veri bulunamadı!');
@@ -81,38 +81,6 @@ const History = () => {
       toast.success('📊 Geçmiş Excel olarak indirildi!');
     } else {
       toast.error('Excel export başarısız!');
-    }
-  };
-
-  const handleExportPDF = () => {
-    if (history.length === 0) {
-      toast.error('Export yapılacak veri bulunamadı!');
-      return;
-    }
-
-    const exportData = history.map(item => ({
-      'Tarih': new Date(item.createdAt).toLocaleString('tr-TR'),
-      'İşlem': item.type === 'in' ? 'Giriş' : item.type === 'out' ? 'Çıkış' : 'Transfer',
-      'Ürün': item.productId?.name || '-',
-      'Şube': branches.find(b => b.value === item.branch)?.label || item.branch,
-      'Miktar': item.quantity,
-      'Not': item.note || '-'
-    }));
-
-    const columns = [
-      { key: 'Tarih', label: 'Tarih' },
-      { key: 'İşlem', label: 'İşlem' },
-      { key: 'Ürün', label: 'Ürün' },
-      { key: 'Şube', label: 'Şube' },
-      { key: 'Miktar', label: 'Miktar' },
-      { key: 'Not', label: 'Not' }
-    ];
-
-    const success = exportToPDF(exportData, `Gecmis_${new Date().toISOString().split('T')[0]}`, 'Geçmiş Raporu', columns);
-    if (success) {
-      toast.success('📄 Geçmiş PDF olarak indirildi!');
-    } else {
-      toast.error('PDF export başarısız!');
     }
   };
 
@@ -148,19 +116,13 @@ const History = () => {
           <p className="text-gray-600 mt-1">Tüm stok hareketleri</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {/* ✅ Sadece Excel Butonu - PDF KALDIRILDI */}
           <button
             onClick={handleExportExcel}
             className="btn-secondary flex items-center gap-2 text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"
           >
             <TableCellsIcon className="h-4 w-4 text-green-600" />
             Excel
-          </button>
-          <button
-            onClick={handleExportPDF}
-            className="btn-secondary flex items-center gap-2 text-sm px-3 py-1.5 border border-gray-300 rounded-lg hover:bg-gray-50"
-          >
-            <DocumentArrowDownIcon className="h-4 w-4 text-red-600" />
-            PDF
           </button>
           <button
             onClick={fetchHistory}

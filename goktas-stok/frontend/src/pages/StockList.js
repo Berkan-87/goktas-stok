@@ -12,10 +12,9 @@ import {
   TrashIcon,
   ChevronDownIcon,
   ChevronRightIcon,
-  DocumentArrowDownIcon,
   TableCellsIcon
 } from '@heroicons/react/24/outline';
-import { exportToExcel, exportToPDF } from '../utils/exportUtils';
+import { exportToExcel } from '../utils/exportUtils';
 
 const StockList = () => {
   const { user } = useSelector((state) => state.auth);
@@ -48,6 +47,16 @@ const StockList = () => {
     { value: 'karsiyaka', label: '🏖️ Karşıyaka' }
   ];
 
+  // ✅ KATEGORİLER - 3 YENİ EKLENDİ
+  const categories = [
+    { id: 'kanat', label: '🚪 Kanat', icon: '🚪' },
+    { id: 'kasa', label: '🪟 Kasa Takım', icon: '🪟' },
+    { id: 'baslik', label: '🎯 Başlık', icon: '🎯' },
+    { id: 'pervaz', label: '📐 Pervazlar', icon: '📐' },
+    { id: 'supurgelik', label: '🧹 Süpürgelikler', icon: '🧹' },
+    { id: 'cam_citasi', label: '🪟 Cam Çıtası', icon: '🪟' }
+  ];
+
   const maxStock = Math.max(...stocks.map(s => s.quantity), 1000);
 
   useEffect(() => {
@@ -70,9 +79,8 @@ const StockList = () => {
     }
   };
 
-  // ✅ EXPORT FONKSİYONLARI - SADECE STOK > 0 OLANLAR
+  // ✅ EXPORT - SADECE STOK > 0 OLANLAR (PDF KALDIRILDI)
   const handleExportExcel = () => {
-    // ✅ Sadece stok miktarı 0'dan büyük olanları filtrele
     const filteredStocks = stocks.filter(s => s.quantity > 0);
     
     if (filteredStocks.length === 0) {
@@ -82,8 +90,7 @@ const StockList = () => {
 
     const exportData = filteredStocks.map(stock => ({
       'Ürün Adı': stock.productId?.name || '-',
-      'Kategori': stock.productId?.category === 'kanat' ? '🚪 Kanat' : 
-                  stock.productId?.category === 'kasa' ? '🪟 Kasa Takım' : '🎯 Başlık',
+      'Kategori': getCategoryLabel(stock.productId?.category) || '-',
       'Renk': stock.productId?.color ? colors.find(c => c.id === stock.productId.color)?.label || '-' : '-',
       'Şube': branches.find(b => b.value === stock.branch)?.label || stock.branch,
       'Miktar': stock.quantity,
@@ -105,68 +112,27 @@ const StockList = () => {
     setExportDropdownOpen(false);
   };
 
-  const handleExportPDF = () => {
-    // ✅ Sadece stok miktarı 0'dan büyük olanları filtrele
-    const filteredStocks = stocks.filter(s => s.quantity > 0);
-    
-    if (filteredStocks.length === 0) {
-      toast.error('Export yapılacak veri bulunamadı!');
-      return;
-    }
-
-    const exportData = filteredStocks.map(stock => ({
-      'Ürün Adı': stock.productId?.name || '-',
-      'Kategori': stock.productId?.category === 'kanat' ? 'Kanat' : 
-                  stock.productId?.category === 'kasa' ? 'Kasa Takım' : 'Başlık',
-      'Renk': stock.productId?.color ? colors.find(c => c.id === stock.productId.color)?.label || '-' : '-',
-      'Şube': branches.find(b => b.value === stock.branch)?.label || stock.branch,
-      'Miktar': stock.quantity,
-      'Kritik Seviye': stock.criticalLevel || 50,
-      'Durum': stock.quantity <= 10 ? 'Kritik' : 
-               stock.quantity <= 25 ? 'Uyarı' : 
-               stock.quantity <= 50 ? 'Düşük' : 'Yeterli'
-    }));
-
-    const columns = [
-      { key: 'Ürün Adı', label: 'Ürün Adı' },
-      { key: 'Kategori', label: 'Kategori' },
-      { key: 'Renk', label: 'Renk' },
-      { key: 'Şube', label: 'Şube' },
-      { key: 'Miktar', label: 'Miktar' },
-      { key: 'Kritik Seviye', label: 'Kritik Seviye' },
-      { key: 'Durum', label: 'Durum' }
-    ];
-
-    const title = `Tüm Stok Raporu (${branches.find(b => b.value === selectedBranch)?.label})`;
-    const filename = `TumStoklar_${branches.find(b => b.value === selectedBranch)?.label}_${new Date().toISOString().split('T')[0]}`;
-    const success = exportToPDF(exportData, filename, title, columns);
-    
-    if (success) {
-      toast.success(`📄 ${exportData.length} stok kaydı PDF olarak indirildi!`);
-    } else {
-      toast.error('PDF export başarısız!');
-    }
-    setExportDropdownOpen(false);
+  // ✅ Kategori etiketini bul
+  const getCategoryLabel = (categoryId) => {
+    const cat = categories.find(c => c.id === categoryId);
+    return cat ? cat.label : categoryId;
   };
 
-  // ✅ Kategori bazlı export - SADECE STOK > 0 OLANLAR
+  // ✅ Kategori bazlı export
   const handleExportFiltered = (category) => {
-    // ✅ Sadece stok miktarı 0'dan büyük olanları filtrele
     const filteredStocks = stocks.filter(s => 
       s.productId?.category === category && s.quantity > 0
     );
     
     if (filteredStocks.length === 0) {
-      const categoryName = category === 'kanat' ? 'Kanat' : 
-                          category === 'kasa' ? 'Kasa' : 'Başlık';
+      const categoryName = categories.find(c => c.id === category)?.label || category;
       toast.error(`${categoryName} kategorisinde stok bulunamadı!`);
       return;
     }
 
     const exportData = filteredStocks.map(stock => ({
       'Ürün Adı': stock.productId?.name || '-',
-      'Kategori': stock.productId?.category === 'kanat' ? '🚪 Kanat' : 
-                  stock.productId?.category === 'kasa' ? '🪟 Kasa Takım' : '🎯 Başlık',
+      'Kategori': getCategoryLabel(stock.productId?.category) || '-',
       'Renk': stock.productId?.color ? colors.find(c => c.id === stock.productId.color)?.label || '-' : '-',
       'Şube': branches.find(b => b.value === stock.branch)?.label || stock.branch,
       'Miktar': stock.quantity,
@@ -176,15 +142,12 @@ const StockList = () => {
                stock.quantity <= 50 ? '🟡 Düşük' : '🟢 Yeterli'
     }));
 
-    const categoryName = category === 'kanat' ? 'Kanat' : 
-                        category === 'kasa' ? 'Kasa_Takim' : 'Baslik';
-    const filename = `${categoryName}_Stoklari_${branches.find(b => b.value === selectedBranch)?.label}_${new Date().toISOString().split('T')[0]}`;
+    const filename = `${category}_Stoklari_${branches.find(b => b.value === selectedBranch)?.label}_${new Date().toISOString().split('T')[0]}`;
     const success = exportToExcel(exportData, filename);
     
     if (success) {
-      const displayName = category === 'kanat' ? 'Kanat' : 
-                         category === 'kasa' ? 'Kasa' : 'Başlık';
-      toast.success(`📊 ${exportData.length} ${displayName} stok kaydı indirildi!`);
+      const categoryName = categories.find(c => c.id === category)?.label || category;
+      toast.success(`📊 ${exportData.length} ${categoryName} stok kaydı indirildi!`);
     } else {
       toast.error('Export başarısız!');
     }
@@ -226,13 +189,14 @@ const StockList = () => {
       return;
     }
 
-    if ((newProduct.category === 'kasa' || newProduct.category === 'baslik') && !newProduct.color) {
+    // Kasa, Başlık, Pervaz, Süpürgelik, Cam Çıtası için renk zorunlu
+    const colorRequired = ['kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
+    if (colorRequired.includes(newProduct.category) && !newProduct.color) {
       toast.error('Bu kategori için renk seçmelisiniz');
       return;
     }
 
     try {
-      console.log('📤 Yeni ürün gönderiliyor:', newProduct);
       const response = await axios.post('/products', {
         name: newProduct.name,
         description: newProduct.description,
@@ -240,13 +204,11 @@ const StockList = () => {
         category: newProduct.category,
         color: newProduct.color || null
       });
-      console.log('✅ Ürün eklendi:', response.data);
       toast.success(`${newProduct.name} başarıyla eklendi`);
       setShowAddProduct(false);
       setNewProduct({ name: '', description: '', category: 'kanat', color: '' });
       fetchData();
     } catch (error) {
-      console.error('❌ Ürün ekleme hatası:', error);
       toast.error(error.response?.data?.message || 'Ürün eklenemedi');
     }
   };
@@ -259,7 +221,7 @@ const StockList = () => {
       setShowDeleteConfirm(null);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Ürün çıkarılamadı');
+      toast.error('Ürün çıkarılamadı');
     }
   };
 
@@ -317,7 +279,7 @@ const StockList = () => {
     
     const name = product.name.toUpperCase();
     
-    if (name.includes('TAŞ')|| name.includes('TAS') || name.includes('TG')) {
+    if (name.includes('TAŞ') || name.includes('TAS') || name.includes('TG')) {
       return 'tas_gri';
     }
     if (name.includes('KOYU') || name.includes('KG')) {
@@ -333,6 +295,7 @@ const StockList = () => {
     return null;
   };
 
+  // ✅ Kategoriye göre gruplama (Kanat - Model bazlı)
   const groupProductsByModel = (category) => {
     const filteredProducts = products.filter(p => p.category === category);
     const groups = {};
@@ -346,6 +309,7 @@ const StockList = () => {
     return groups;
   };
 
+  // ✅ Renk bazlı gruplama (Kasa, Başlık, Pervaz, Süpürgelik, Cam Çıtası)
   const groupProductsByColor = (category) => {
     const filteredProducts = products.filter(p => p.category === category);
     const groups = {};
@@ -388,6 +352,7 @@ const StockList = () => {
     }));
   };
 
+  // ✅ Kategori Kartı (Kanat - Model bazlı)
   const KanatGroupCard = ({ groupName, products: groupProducts }) => {
     const isExpanded = expandedGroups[groupName] !== false;
     const totalStock = groupProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
@@ -432,6 +397,7 @@ const StockList = () => {
     );
   };
 
+  // ✅ Renk Kartı (Kasa, Başlık, Pervaz, Süpürgelik, Cam Çıtası)
   const ColorCard = ({ colorLabel, products: colorProducts, category }) => {
     const isExpanded = expandedGroups[colorLabel] !== false;
     const totalStock = colorProducts.reduce((sum, p) => sum + getStockForProduct(p._id), 0);
@@ -439,15 +405,33 @@ const StockList = () => {
     const isOther = colorLabel === 'Diğer';
     const isAcikGri = colorLabel === 'Açık Gri';
     
-    const categoryEmoji = category === 'kasa' ? '🪟' : '🎯';
-    const borderColor = category === 'kasa' ? 'border-purple-500' : 'border-green-500';
-    const bgColor = category === 'kasa' ? 'from-purple-50 to-purple-100' : 'from-green-50 to-green-100';
-    const badgeColor = category === 'kasa' ? 'bg-purple-100 text-purple-700' : 'bg-green-100 text-green-700';
+    const categoryEmoji = categories.find(c => c.id === category)?.icon || '📦';
+    const borderColors = {
+      kasa: 'border-purple-500',
+      baslik: 'border-green-500',
+      pervaz: 'border-orange-500',
+      supurgelik: 'border-yellow-500',
+      cam_citasi: 'border-pink-500'
+    };
+    const bgColors = {
+      kasa: 'from-purple-50 to-purple-100',
+      baslik: 'from-green-50 to-green-100',
+      pervaz: 'from-orange-50 to-orange-100',
+      supurgelik: 'from-yellow-50 to-yellow-100',
+      cam_citasi: 'from-pink-50 to-pink-100'
+    };
+    const badgeColors = {
+      kasa: 'bg-purple-100 text-purple-700',
+      baslik: 'bg-green-100 text-green-700',
+      pervaz: 'bg-orange-100 text-orange-700',
+      supurgelik: 'bg-yellow-100 text-yellow-700',
+      cam_citasi: 'bg-pink-100 text-pink-700'
+    };
 
     return (
-      <div className={`bg-white rounded-xl shadow-md overflow-hidden border-l-4 ${borderColor} hover:shadow-lg transition-shadow duration-300`}>
+      <div className={`bg-white rounded-xl shadow-md overflow-hidden border-l-4 ${borderColors[category] || 'border-gray-500'} hover:shadow-lg transition-shadow duration-300`}>
         <div 
-          className={`flex items-center justify-between p-4 bg-gradient-to-r ${bgColor} cursor-pointer hover:opacity-90 transition-opacity`}
+          className={`flex items-center justify-between p-4 bg-gradient-to-r ${bgColors[category] || 'from-gray-50 to-gray-100'} cursor-pointer hover:opacity-90 transition-opacity`}
           onClick={() => toggleGroup(colorLabel)}
         >
           <div className="flex items-center gap-3">
@@ -487,7 +471,7 @@ const StockList = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className={`px-3 py-1 rounded-full text-xs font-medium ${badgeColor}`}>
+            <span className={`px-3 py-1 rounded-full text-xs font-medium ${badgeColors[category] || 'bg-gray-100 text-gray-700'}`}>
               {totalStock > 500 ? '🟢 Yüksek' :
                totalStock > 200 ? '🟡 Orta' :
                totalStock > 50 ? '🟠 Düşük' :
@@ -498,7 +482,7 @@ const StockList = () => {
         </div>
 
         {isExpanded && (
-          <div className={`p-4 ${category === 'kasa' ? 'bg-purple-50' : 'bg-green-50'}`}>
+          <div className={`p-4 ${bgColors[category]?.replace('from-', 'bg-').replace(' to-', '') || 'bg-gray-50'}`}>
             {colorProducts.length > 0 ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {colorProducts.map(product => renderProductCard(product))}
@@ -522,7 +506,7 @@ const StockList = () => {
     const isEditing = editingProduct?._id === product._id && user?.role === 'admin';
     const colorId = getProductColor(product);
     const colorInfo = colors.find(c => c.id === colorId);
-    const isKasaOrBaslik = product.category === 'kasa' || product.category === 'baslik';
+    const isColorRequired = ['kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'].includes(product.category);
 
     return (
       <div key={product._id} className="bg-white rounded-lg p-3 border border-gray-200 hover:shadow-md transition-shadow">
@@ -541,11 +525,11 @@ const StockList = () => {
                 onChange={(e) => setEditForm({ ...editForm, category: e.target.value })}
                 className="input-field text-xs py-1"
               >
-                <option value="kanat">🚪 Kanat</option>
-                <option value="kasa">🪟 Kasa Takım</option>
-                <option value="baslik">🎯 Başlık</option>
+                {categories.map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.label}</option>
+                ))}
               </select>
-              {(editForm.category === 'kasa' || editForm.category === 'baslik') && (
+              {isColorRequired && (
                 <select
                   value={editForm.color || product.color || ''}
                   onChange={(e) => setEditForm({ ...editForm, color: e.target.value })}
@@ -577,10 +561,9 @@ const StockList = () => {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-gray-800 text-sm">{product.name}</span>
               <span className="text-xs text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">
-                {product.category === 'kanat' ? '🚪' : 
-                 product.category === 'kasa' ? '🪟' : '🎯'}
+                {categories.find(c => c.id === product.category)?.icon || '📦'}
               </span>
-              {isKasaOrBaslik && colorInfo && (
+              {isColorRequired && colorInfo && (
                 <span 
                   className="text-xs px-1.5 py-0.5 rounded-full font-medium"
                   style={{
@@ -679,33 +662,43 @@ const StockList = () => {
     );
   };
 
+  // ✅ Kategorilere göre ürünleri grupla
   const kanatGroups = groupProductsByModel('kanat');
   const kasaGroups = groupProductsByColor('kasa');
   const baslikGroups = groupProductsByColor('baslik');
+  const pervazGroups = groupProductsByColor('pervaz');
+  const supurgelikGroups = groupProductsByColor('supurgelik');
+  const camCitasiGroups = groupProductsByColor('cam_citasi');
 
-  const orderedKasaGroups = {};
-  colors.forEach(color => {
-    if (kasaGroups[color.label] && kasaGroups[color.label].length > 0) {
-      orderedKasaGroups[color.label] = kasaGroups[color.label];
+  // ✅ Renk sırasına göre düzenle
+  const orderGroups = (groups) => {
+    const ordered = {};
+    colors.forEach(color => {
+      if (groups[color.label] && groups[color.label].length > 0) {
+        ordered[color.label] = groups[color.label];
+      }
+    });
+    if (groups['Diğer'] && groups['Diğer'].length > 0) {
+      ordered['Diğer'] = groups['Diğer'];
     }
-  });
-  if (kasaGroups['Diğer'] && kasaGroups['Diğer'].length > 0) {
-    orderedKasaGroups['Diğer'] = kasaGroups['Diğer'];
-  }
+    return ordered;
+  };
 
-  const orderedBaslikGroups = {};
-  colors.forEach(color => {
-    if (baslikGroups[color.label] && baslikGroups[color.label].length > 0) {
-      orderedBaslikGroups[color.label] = baslikGroups[color.label];
-    }
-  });
-  if (baslikGroups['Diğer'] && baslikGroups['Diğer'].length > 0) {
-    orderedBaslikGroups['Diğer'] = baslikGroups['Diğer'];
-  }
+  const orderedKasaGroups = orderGroups(kasaGroups);
+  const orderedBaslikGroups = orderGroups(baslikGroups);
+  const orderedPervazGroups = orderGroups(pervazGroups);
+  const orderedSupurgelikGroups = orderGroups(supurgelikGroups);
+  const orderedCamCitasiGroups = orderGroups(camCitasiGroups);
 
-  const kanatCount = products.filter(p => p.category === 'kanat').length;
-  const kasaCount = products.filter(p => p.category === 'kasa').length;
-  const baslikCount = products.filter(p => p.category === 'baslik').length;
+  // ✅ Kategori sayıları
+  const categoryCounts = {
+    kanat: products.filter(p => p.category === 'kanat').length,
+    kasa: products.filter(p => p.category === 'kasa').length,
+    baslik: products.filter(p => p.category === 'baslik').length,
+    pervaz: products.filter(p => p.category === 'pervaz').length,
+    supurgelik: products.filter(p => p.category === 'supurgelik').length,
+    cam_citasi: products.filter(p => p.category === 'cam_citasi').length
+  };
 
   if (loading) {
     return (
@@ -735,15 +728,6 @@ const StockList = () => {
               <TableCellsIcon className="h-4 w-4 text-green-600" />
               <span className="hidden xs:inline text-gray-700">Excel</span>
             </button>
-            
-            <button
-              onClick={handleExportPDF}
-              className="btn-secondary flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              title="Tüm stokları PDF olarak indir"
-            >
-              <DocumentArrowDownIcon className="h-4 w-4 text-red-600" />
-              <span className="hidden xs:inline text-gray-700">PDF</span>
-            </button>
 
             <div className="relative">
               <button
@@ -764,24 +748,15 @@ const StockList = () => {
                     onClick={() => setExportDropdownOpen(false)}
                   />
                   <div className="absolute right-0 mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-20">
-                    <button
-                      onClick={() => handleExportFiltered('kanat')}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-t-lg transition-colors"
-                    >
-                      🚪 Sadece Kanatlar
-                    </button>
-                    <button
-                      onClick={() => handleExportFiltered('kasa')}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors"
-                    >
-                      🪟 Sadece Kasa Takım
-                    </button>
-                    <button
-                      onClick={() => handleExportFiltered('baslik')}
-                      className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 rounded-b-lg transition-colors"
-                    >
-                      🎯 Sadece Başlık
-                    </button>
+                    {categories.map(cat => (
+                      <button
+                        key={cat.id}
+                        onClick={() => handleExportFiltered(cat.id)}
+                        className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition-colors"
+                      >
+                        {cat.label}
+                      </button>
+                    ))}
                   </div>
                 </>
               )}
@@ -811,50 +786,29 @@ const StockList = () => {
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto">
-        <button
-          onClick={() => setActiveTab('kanat')}
-          className={`px-4 py-2 font-medium text-sm transition-colors relative whitespace-nowrap ${
-            activeTab === 'kanat'
-              ? 'text-blue-600 border-b-2 border-blue-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          🚪 Kanat
-          <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-            {kanatCount}
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('kasa')}
-          className={`px-4 py-2 font-medium text-sm transition-colors relative whitespace-nowrap ${
-            activeTab === 'kasa'
-              ? 'text-purple-600 border-b-2 border-purple-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          🪟 Kasa Takım
-          <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-            {kasaCount}
-          </span>
-        </button>
-        <button
-          onClick={() => setActiveTab('baslik')}
-          className={`px-4 py-2 font-medium text-sm transition-colors relative whitespace-nowrap ${
-            activeTab === 'baslik'
-              ? 'text-green-600 border-b-2 border-green-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-        >
-          🎯 Başlık
-          <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
-            {baslikCount}
-          </span>
-        </button>
+      {/* ✅ Kategori Sekmeleri - 6 KATEGORİ */}
+      <div className="flex gap-2 border-b border-gray-200 overflow-x-auto pb-1">
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setActiveTab(cat.id)}
+            className={`px-4 py-2 font-medium text-sm transition-colors relative whitespace-nowrap ${
+              activeTab === cat.id
+                ? `text-${cat.id === 'kanat' ? 'blue' : cat.id === 'kasa' ? 'purple' : cat.id === 'baslik' ? 'green' : cat.id === 'pervaz' ? 'orange' : cat.id === 'supurgelik' ? 'yellow' : 'pink'}-600 border-b-2 border-${cat.id === 'kanat' ? 'blue' : cat.id === 'kasa' ? 'purple' : cat.id === 'baslik' ? 'green' : cat.id === 'pervaz' ? 'orange' : cat.id === 'supurgelik' ? 'yellow' : 'pink'}-600`
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {cat.label}
+            <span className="ml-2 text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+              {categoryCounts[cat.id] || 0}
+            </span>
+          </button>
+        ))}
       </div>
 
+      {/* ✅ Kategori İçeriği */}
       <div className="space-y-4">
-        {activeTab === 'kanat' ? (
+        {activeTab === 'kanat' && (
           Object.keys(kanatGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
               <p className="text-lg text-gray-500">🚪 Kanat kategorisinde ürün bulunmuyor</p>
@@ -869,7 +823,9 @@ const StockList = () => {
               />
             ))
           )
-        ) : activeTab === 'kasa' ? (
+        )}
+
+        {activeTab === 'kasa' && (
           Object.keys(orderedKasaGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
               <p className="text-lg text-gray-500">🪟 Kasa Takım kategorisinde ürün bulunmuyor</p>
@@ -885,7 +841,9 @@ const StockList = () => {
               />
             ))
           )
-        ) : (
+        )}
+
+        {activeTab === 'baslik' && (
           Object.keys(orderedBaslikGroups).length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl shadow">
               <p className="text-lg text-gray-500">🎯 Başlık kategorisinde ürün bulunmuyor</p>
@@ -902,8 +860,63 @@ const StockList = () => {
             ))
           )
         )}
+
+        {activeTab === 'pervaz' && (
+          Object.keys(orderedPervazGroups).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl shadow">
+              <p className="text-lg text-gray-500">📐 Pervazlar kategorisinde ürün bulunmuyor</p>
+              <p className="text-sm text-gray-400 mt-1">Yeni ürün eklemek için "Yeni Ürün Ekle" butonunu kullanın.</p>
+            </div>
+          ) : (
+            Object.entries(orderedPervazGroups).map(([colorLabel, colorProducts]) => (
+              <ColorCard 
+                key={colorLabel} 
+                colorLabel={colorLabel} 
+                products={colorProducts} 
+                category="pervaz"
+              />
+            ))
+          )
+        )}
+
+        {activeTab === 'supurgelik' && (
+          Object.keys(orderedSupurgelikGroups).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl shadow">
+              <p className="text-lg text-gray-500">🧹 Süpürgelikler kategorisinde ürün bulunmuyor</p>
+              <p className="text-sm text-gray-400 mt-1">Yeni ürün eklemek için "Yeni Ürün Ekle" butonunu kullanın.</p>
+            </div>
+          ) : (
+            Object.entries(orderedSupurgelikGroups).map(([colorLabel, colorProducts]) => (
+              <ColorCard 
+                key={colorLabel} 
+                colorLabel={colorLabel} 
+                products={colorProducts} 
+                category="supurgelik"
+              />
+            ))
+          )
+        )}
+
+        {activeTab === 'cam_citasi' && (
+          Object.keys(orderedCamCitasiGroups).length === 0 ? (
+            <div className="text-center py-12 bg-white rounded-xl shadow">
+              <p className="text-lg text-gray-500">🪟 Cam Çıtası kategorisinde ürün bulunmuyor</p>
+              <p className="text-sm text-gray-400 mt-1">Yeni ürün eklemek için "Yeni Ürün Ekle" butonunu kullanın.</p>
+            </div>
+          ) : (
+            Object.entries(orderedCamCitasiGroups).map(([colorLabel, colorProducts]) => (
+              <ColorCard 
+                key={colorLabel} 
+                colorLabel={colorLabel} 
+                products={colorProducts} 
+                category="cam_citasi"
+              />
+            ))
+          )
+        )}
       </div>
 
+      {/* Modal - Stok Giriş/Çıkış */}
       {modalData.show && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -944,6 +957,7 @@ const StockList = () => {
         </div>
       )}
 
+      {/* Modal - Silme Onay */}
       {showDeleteConfirm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto">
@@ -971,6 +985,7 @@ const StockList = () => {
         </div>
       )}
 
+      {/* Modal - Yeni Ürün Ekle */}
       {showAddProduct && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end sm:items-center justify-center z-50">
           <div className="bg-white rounded-t-xl sm:rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto max-h-[90vh] overflow-y-auto">
@@ -986,13 +1001,13 @@ const StockList = () => {
                   className="input-field"
                   required
                 >
-                  <option value="kanat">🚪 Kanat</option>
-                  <option value="kasa">🪟 Kasa Takım</option>
-                  <option value="baslik">🎯 Başlık</option>
+                  {categories.map(cat => (
+                    <option key={cat.id} value={cat.id}>{cat.label}</option>
+                  ))}
                 </select>
               </div>
 
-              {(newProduct.category === 'kasa' || newProduct.category === 'baslik') && (
+              {['kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'].includes(newProduct.category) && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Renk *</label>
                   <select

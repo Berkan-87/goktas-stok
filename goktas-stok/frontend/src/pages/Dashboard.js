@@ -8,15 +8,14 @@ import {
   ClockIcon,
   ExclamationTriangleIcon,
   ArrowUpIcon,
+  ArrowDownIcon,
   BuildingOfficeIcon,
   ChartBarIcon,
-  DocumentArrowDownIcon,
   TableCellsIcon
 } from '@heroicons/react/24/outline';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
 import { 
   exportToExcel, 
-  exportToPDF, 
   prepareModelOutgoingData, 
   prepareBranchStockData, 
   prepareLowStockData 
@@ -34,6 +33,7 @@ const Dashboard = () => {
   const [chartData, setChartData] = useState([]);
   const [modelOutgoingData, setModelOutgoingData] = useState([]);
   const [branchStockData, setBranchStockData] = useState([]);
+  const [topOutgoingModels, setTopOutgoingModels] = useState([]); // ✅ YENİ
   const [loading, setLoading] = useState(true);
   const [dateRange, setDateRange] = useState('6months');
   const [selectedBranch, setSelectedBranch] = useState('fabrika');
@@ -98,28 +98,6 @@ const Dashboard = () => {
     }
   };
 
-  // ✅ PDF Export
-  const handleExportPDF = () => {
-    if (modelOutgoingData.length === 0) {
-      toast.error('Export yapılacak veri bulunamadı!');
-      return;
-    }
-    const data = prepareModelOutgoingData(modelOutgoingData);
-    const columns = [
-      { key: 'Model', label: 'Model' },
-      { key: 'Çıkış (Adet)', label: 'Çıkış' },
-      { key: 'Kalan Stok (Adet)', label: 'Kalan Stok' },
-      { key: 'Durum', label: 'Durum' }
-    ];
-    const title = `Model Bazlı Çıkış Raporu (${branches.find(b => b.value === selectedBranch)?.label} - ${dateRangeOptions.find(d => d.value === dateRange)?.label})`;
-    const success = exportToPDF(data, `ModelBazliCikisRaporu_${new Date().toISOString().split('T')[0]}`, title, columns);
-    if (success) {
-      toast.success('PDF raporu başarıyla indirildi! 📄');
-    } else {
-      toast.error('PDF export başarısız!');
-    }
-  };
-
   // ✅ Tüm Raporları İndir
   const handleExportAll = () => {
     if (modelOutgoingData.length === 0 && branchStockData.length === 0 && lowStockItems.length === 0) {
@@ -155,13 +133,15 @@ const Dashboard = () => {
     try {
       const startDate = getDateRangeFilter();
       
-      // ✅ SADECE products ve stock çağır - history'yi KALDIR
-      const [productsRes, stockRes] = await Promise.all([
+      // ✅ History verisini de çek
+      const [productsRes, stockRes, historyRes] = await Promise.all([
         axios.get('/products'),
-        axios.get('/stock')
+        axios.get('/stock'),
+        axios.get(`/history?limit=1000&startDate=${startDate}`)
       ]);
 
       const stocks = stockRes.data;
+      const history = historyRes.data || [];
       
       // ✅ Sadece kanat ürünleri
       const kanatProducts = productsRes.data.filter(p => p.category === 'kanat');
@@ -183,6 +163,15 @@ const Dashboard = () => {
       );
       const branchLowStock = allLowStock.filter(s => s.branch === selectedBranch);
       
+      // ✅ Çıkış işlemleri
+      const outgoingTransactions = history.filter(t => t.type === 'out');
+      const branchOutgoing = outgoingTransactions.filter(t => t.branch === selectedBranch);
+      
+      // ✅ Toplam çıkış
+      const totalOutgoing = branchOutgoing
+        .filter(t => kanatProductIds.has(t.productId?._id))
+        .reduce((sum, t) => sum + t.quantity, 0);
+
       // ✅ Model bazlı stok
       const modelStockData = {};
       branchKanatStocks.forEach(s => {
@@ -199,7 +188,7 @@ const Dashboard = () => {
         totalProducts: kanatProducts.length,
         totalStock,
         lowStock: branchLowStock.length,
-        totalOutgoing: 0 // Geçici olarak 0
+        totalOutgoing
       });
 
       // ✅ Düşük stok listesi
@@ -208,11 +197,45 @@ const Dashboard = () => {
         .slice(0, 10);
       setLowStockItems(sortedLowItems);
 
-      // ✅ Model bazlı veri
+      // ✅ Model bazlı çıkış verisi (GRAFİK İÇİN)
+      const modelOutgoing = {};
+      const modelOutgoingCount = {};
+
+      branchOutgoing.forEach(t => {
+        if (!kanatProductIds.has(t.productId?._id)) return;
+        
+        const productName = t.productId?.name || 'Bilinmeyen';
+        const cleanName = productName.replace(/\s*(87|77|Camlı|Camli|Cam)\s*$/i, '').trim();
+        
+        if (!modelOutgoing[cleanName]) {
+          modelOutgoing[cleanName] = 0;
+          modelOutgoingCount[cleanName] = 0;
+        }
+        modelOutgoing[cleanName] += t.quantity;
+        modelOutgoingCount[cleanName] += 1;
+      });
+
+      // ✅ En çok çıkış yapan modelleri sırala (GRAFİK İÇİN)
+      const sortedTopModels = Object.entries(modelOutgoing)
+        .map(([model, quantity]) => ({
+          model,
+          quantity,
+          count: modelOutgoingCount[model] || 0,
+          status: quantity > 200 ? 'Yüksek' : quantity > 100 ? 'Orta' : 'Düşük',
+          statusColor: quantity > 200 ? 'bg-green-100 text-green-700' : 
+                       quantity > 100 ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700',
+          statusDot: quantity > 200 ? '🟢' : quantity > 100 ? '🟡' : '🔴'
+        }))
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 10); // En çok 10 model
+
+      setTopOutgoingModels(sortedTopModels);
+
+      // ✅ Model bazlı stok durumu (mevcut grafik)
       const sortedModelData = Object.entries(modelStockData)
         .map(([model, quantity]) => ({
           model,
-          quantity: 0, // Çıkış yok
+          quantity: 0,
           currentStock: quantity,
           status: quantity > 200 ? 'Yüksek' : quantity > 100 ? 'Orta' : 'Düşük',
           statusColor: quantity > 200 ? 'bg-green-100 text-green-700' : 
@@ -281,7 +304,6 @@ const Dashboard = () => {
     } catch (error) {
       console.error('Dashboard verileri alınamadı:', error);
       
-      // ✅ Daha açıklayıcı hata mesajı
       if (error.response?.status === 404) {
         toast.error('Bazı veriler alınamadı (API endpointi bulunamadı)');
       } else {
@@ -336,6 +358,7 @@ const Dashboard = () => {
   ];
 
   const topModels = modelOutgoingData.slice(0, 6);
+  const topOutgoing = topOutgoingModels.slice(0, 6);
 
   if (loading) {
     return (
@@ -371,16 +394,6 @@ const Dashboard = () => {
             >
               <TableCellsIcon className="h-4 w-4 text-green-600" />
               <span className="hidden xs:inline text-gray-700">Excel</span>
-            </button>
-            
-            <button
-              onClick={handleExportPDF}
-              className="btn-secondary flex items-center gap-1 sm:gap-2 text-xs sm:text-sm px-2 sm:px-4 py-1.5 sm:py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-              title="PDF olarak indir"
-              disabled={modelOutgoingData.length === 0}
-            >
-              <DocumentArrowDownIcon className="h-4 w-4 text-red-600" />
-              <span className="hidden xs:inline text-gray-700">PDF</span>
             </button>
             
             <button
@@ -450,9 +463,97 @@ const Dashboard = () => {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Model Bazlı Stok Raporu */}
-        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        {/* ✅ EN ÇOK ÇIKIŞ YAPAN MODELLER (YENİ GRAFİK) */}
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <h2 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <ArrowUpIcon className="h-5 w-5 text-red-500" />
+              En Çok Çıkış Yapan Modeller
+            </h2>
+            <div className="flex items-center gap-2 text-xs text-gray-400">
+              <span>{dateRangeOptions.find(d => d.value === dateRange)?.label}</span>
+              <span>•</span>
+              <span>{branches.find(b => b.value === selectedBranch)?.label}</span>
+            </div>
+          </div>
+          
+          {topOutgoing.length > 0 ? (
+            <>
+              <div className="h-56 sm:h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={topOutgoing} layout="vertical" margin={{ left: 0, right: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                    <XAxis type="number" tick={{ fontSize: 11 }} />
+                    <YAxis 
+                      type="category" 
+                      dataKey="model" 
+                      tick={{ fontSize: 11 }}
+                      width={100}
+                    />
+                    <Tooltip 
+                      formatter={(value) => [`${value} adet`, 'Çıkış']}
+                      labelFormatter={(label) => `Model: ${label}`}
+                    />
+                    <Bar dataKey="quantity" radius={[0, 4, 4, 0]}>
+                      {topOutgoing.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={entry.quantity > 200 ? '#10b981' : entry.quantity > 100 ? '#f59e0b' : '#ef4444'} 
+                        />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="mt-4 overflow-x-auto">
+                <table className="w-full text-xs sm:text-sm">
+                  <thead className="bg-gray-50 rounded-lg">
+                    <tr>
+                      <th className="text-left py-2 px-2 sm:px-3 font-medium text-gray-600">Model</th>
+                      <th className="text-right py-2 px-2 sm:px-3 font-medium text-gray-600">Çıkış (Adet)</th>
+                      <th className="text-center py-2 px-2 sm:px-3 font-medium text-gray-600">Durum</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topOutgoing.map((item, index) => (
+                      <tr key={index} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                        <td className="py-2 px-2 sm:px-3 font-medium text-gray-800 truncate max-w-[80px] sm:max-w-none">
+                          {item.model}
+                        </td>
+                        <td className="py-2 px-2 sm:px-3 text-right font-bold text-red-600">
+                          {item.quantity} adet
+                        </td>
+                        <td className="py-2 px-2 sm:px-3 text-center">
+                          <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.statusColor}`}>
+                            {item.statusDot} {item.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {topOutgoing.length > 0 && (
+                  <p className="text-center text-xs text-gray-400 mt-2">
+                    En çok çıkış yapan {topOutgoing.length} model
+                  </p>
+                )}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-12">
+              <div className="text-4xl mb-2">📭</div>
+              <p className="text-gray-500">Bu dönemde çıkış yapılmamış</p>
+              <p className="text-xs text-gray-400 mt-1">
+                {dateRangeOptions.find(d => d.value === dateRange)?.label} içinde çıkış verisi bulunamadı
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Model Bazlı Stok Durumu */}
+        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <h2 className="text-base sm:text-lg font-semibold text-gray-900 flex items-center gap-2">
               <ChartBarIcon className="h-5 w-5 text-blue-500" />
@@ -467,7 +568,7 @@ const Dashboard = () => {
           
           {modelOutgoingData.length > 0 ? (
             <>
-              <div className="h-56 sm:h-72">
+              <div className="h-56 sm:h-64">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={topModels} layout="vertical" margin={{ left: 0, right: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" horizontal={false} />
@@ -538,9 +639,11 @@ const Dashboard = () => {
             </div>
           )}
         </div>
+      </div>
 
-        {/* Düşük Stok Uyarıları */}
-        <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
+      {/* Düşük Stok Uyarıları */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="lg:col-span-1 bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
           <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
             <ExclamationTriangleIcon className="h-5 w-5 text-yellow-500" />
             Düşük Stok Uyarıları
@@ -598,66 +701,66 @@ const Dashboard = () => {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Şube Bazlı Stok Dağılımı */}
-      <div className="bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
-        <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <BuildingOfficeIcon className="h-5 w-5 text-blue-500" />
-          Şube Bazlı Stok Dağılımı
-        </h2>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="h-56 sm:h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} %${(percent * 100).toFixed(0)}`}
-                  outerRadius={70}
-                  dataKey="value"
-                >
-                  {chartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip formatter={(value) => [`${value} adet`]} />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Şube Bazlı Stok Dağılımı */}
+        <div className="lg:col-span-2 bg-white rounded-xl shadow-sm p-4 sm:p-6 border border-gray-100">
+          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <BuildingOfficeIcon className="h-5 w-5 text-blue-500" />
+            Şube Bazlı Stok Dağılımı
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="h-56 sm:h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} %${(percent * 100).toFixed(0)}`}
+                    outerRadius={70}
+                    dataKey="value"
+                  >
+                    {chartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value) => [`${value} adet`]} />
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
 
-          <div className="space-y-3">
-            {branchStockData.map((item, index) => (
-              <div key={index} className="flex items-center gap-3">
-                <div className="w-8 text-center text-lg">{item.icon}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-gray-700 truncate">{item.branch}</span>
-                    <span className="text-sm font-bold text-gray-900">{item.stok} adet</span>
+            <div className="space-y-3">
+              {branchStockData.map((item, index) => (
+                <div key={index} className="flex items-center gap-3">
+                  <div className="w-8 text-center text-lg">{item.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-700 truncate">{item.branch}</span>
+                      <span className="text-sm font-bold text-gray-900">{item.stok} adet</span>
+                    </div>
+                    <div className="mt-1 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full rounded-full transition-all"
+                        style={{ 
+                          width: `${item.percentage}%`,
+                          backgroundColor: item.color 
+                        }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-400 mt-0.5">%{item.percentage}</p>
                   </div>
-                  <div className="mt-1 w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                    <div 
-                      className="h-full rounded-full transition-all"
-                      style={{ 
-                        width: `${item.percentage}%`,
-                        backgroundColor: item.color 
-                      }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 mt-0.5">%{item.percentage}</p>
                 </div>
+              ))}
+              
+              <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
+                <span className="text-sm font-semibold text-gray-700">Toplam Stok</span>
+                <span className="text-lg font-bold text-gray-900">
+                  {branchStockData.reduce((sum, item) => sum + item.stok, 0)} adet
+                </span>
               </div>
-            ))}
-            
-            <div className="pt-3 border-t border-gray-200 flex items-center justify-between">
-              <span className="text-sm font-semibold text-gray-700">Toplam Stok</span>
-              <span className="text-lg font-bold text-gray-900">
-                {branchStockData.reduce((sum, item) => sum + item.stok, 0)} adet
-              </span>
             </div>
           </div>
         </div>

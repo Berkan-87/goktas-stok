@@ -5,7 +5,7 @@ const productSchema = new mongoose.Schema({
     type: String,
     required: [true, 'Ürün adı zorunludur'],
     trim: true,
-    unique: true // ✅ Sadece name benzersiz olsun
+    unique: true
   },
   description: {
     type: String,
@@ -18,7 +18,7 @@ const productSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['kanat', 'kasa', 'baslik'],
+    enum: ['kanat', 'kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'],
     default: 'kanat',
     required: [true, 'Kategori seçilmesi zorunludur']
   },
@@ -26,16 +26,15 @@ const productSchema = new mongoose.Schema({
     type: String,
     enum: ['bute_beyaz', 'koyu_gri', 'acik_gri', 'tas_gri', null],
     default: null,
-    // ✅ Kasa ve Başlık için renk zorunlu (validate ile kontrol)
     validate: {
       validator: function(value) {
-        // Eğer kategori kasa veya baslik ise renk zorunlu
-        if (this.category === 'kasa' || this.category === 'baslik') {
+        const colorRequired = ['kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
+        if (colorRequired.includes(this.category)) {
           return value !== null && value !== undefined && value !== '';
         }
-        return true; // Kanat için renk zorunlu değil
+        return true;
       },
-      message: 'Kasa ve Başlık kategorileri için renk seçimi zorunludur'
+      message: 'Kasa, Başlık, Pervaz, Süpürgelik ve Cam Çıtası kategorileri için renk seçimi zorunludur'
     }
   },
   isActive: {
@@ -43,23 +42,19 @@ const productSchema = new mongoose.Schema({
     default: true
   }
 }, { 
-  timestamps: true
+  timestamps: true 
 });
 
-// ✅ Sadece name için benzersiz indeks
 productSchema.index({ name: 1 }, { unique: true });
-
-// ✅ Kategori + renk için indeks (sorguları hızlandırmak için)
 productSchema.index({ category: 1, color: 1 });
 
-// ✅ Pre-save middleware ile ek renk kontrolü (opsiyonel)
 productSchema.pre('save', function(next) {
-  // Kasa veya Başlık için renk kontrolü
-  if ((this.category === 'kasa' || this.category === 'baslik') && !this.color) {
-    return next(new Error('Kasa ve Başlık kategorileri için renk seçimi zorunludur'));
+  const colorRequired = ['kasa', 'baslik', 'pervaz', 'supurgelik', 'cam_citasi'];
+  
+  if (colorRequired.includes(this.category) && !this.color) {
+    return next(new Error('Kasa, Başlık, Pervaz, Süpürgelik ve Cam Çıtası kategorileri için renk seçimi zorunludur'));
   }
   
-  // Kanat için renk null yap (gereksiz renk verisi olmasın)
   if (this.category === 'kanat') {
     this.color = null;
   }

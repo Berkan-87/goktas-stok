@@ -30,7 +30,7 @@ const MainLayout = () => {
     { name: 'Siparişler', icon: ClipboardDocumentListIcon, path: '/uretim' },
     { name: 'Talep-Transfer', icon: ArrowsRightLeftIcon, path: '/transfer' },
     { name: 'Malzeme Depo', icon: BuildingStorefrontIcon, path: '/malzeme-depo' },
-    { name: 'İletişim', icon: ChatBubbleLeftRightIcon, path: '/sohbet' }, // ✅ Badge KALDIRILDI
+    // { name: 'İletişim', icon: ChatBubbleLeftRightIcon, path: '/sohbet' }, // ✅ Badge KALDIRILDI
     { name: 'Geçmiş', icon: ClockIcon, path: '/gecmis' },
   ];
 
