@@ -18,14 +18,14 @@ export const exportToExcel = (data, filename, sheetName = 'Rapor') => {
     const wb = XLSX.utils.book_new();
     const ws = XLSX.utils.json_to_sheet(data);
 
-    // 2️⃣ Sütun genişliklerini hesapla
+    // 2️⃣ Sütun genişliklerini hesapla (daha geniş)
     const headers = Object.keys(data[0] || {});
     const colWidths = headers.map((key) => {
       const maxLength = Math.max(
         key.length,
         ...data.map((row) => String(row[key] || '').length)
       );
-      return { wch: Math.min(maxLength + 2, 35) };
+      return { wch: Math.min(maxLength + 4, 40) };
     });
     ws['!cols'] = colWidths;
 
@@ -159,30 +159,72 @@ export const exportToPDF = (data, filename, title, columns) => {
 };
 
 // ============================
-// 📦 VERİ HAZIRLAMA FONKSİYONLARI
+// 📦 VERİ HAZIRLAMA FONKSİYONLARI (DÜZENLİ VE SIRALI)
 // ============================
+
+/**
+ * Model bazlı çıkış verilerini düzenler ve sıralar.
+ * - Model isimlerini temizler (örn: "5004 77" -> "5004" gibi)
+ * - Benzer modelleri gruplar ve sıralar
+ */
 export const prepareModelOutgoingData = (data) => {
   if (!data || data.length === 0) return [];
-  return data.map((item) => ({
-    Model: item.model || 'Belirsiz',
-    'Çıkış (Adet)': item.quantity || 0,
-    'Kalan Stok (Adet)': item.currentStock || 0,
-    Durum: item.status || 'Belirsiz'
+
+  // Önce veriyi kopyala ve dönüştür
+  const formatted = data.map((item) => ({
+    // Model adını temizle (sayı ve harf karışımını koru, ama "77", "87", "Cam" gibi ekleri kaldır)
+    // Örnek: "5004 Kanat 77" -> "5004 Kanat"
+    modelClean: item.model?.replace(/\s*(87|77|Camlı|Camli|Cam)\s*$/i, '').trim() || 'Belirsiz',
+    model: item.model || 'Belirsiz',
+    quantity: item.quantity || 0,
+    currentStock: item.currentStock || 0,
+    status: item.status || 'Belirsiz'
+  }));
+
+  // Sıralama: önce temiz modele göre alfabetik (benzerler yan yana), sonra çıkış miktarına göre azalan
+  formatted.sort((a, b) => {
+    // Önce temiz modele göre sırala
+    if (a.modelClean < b.modelClean) return -1;
+    if (a.modelClean > b.modelClean) return 1;
+    // Aynı temiz model ise çıkış miktarına göre azalan
+    return b.quantity - a.quantity;
+  });
+
+  // Sonuç: sadece istenen sütunları döndür (modelClean yerine model kullan)
+  return formatted.map((item) => ({
+    Model: item.model,
+    'Çıkış (Adet)': item.quantity,
+    'Kalan Stok (Adet)': item.currentStock,
+    Durum: item.status
   }));
 };
 
+/**
+ * Şube bazlı stok verilerini düzenler ve sıralar (stok miktarına göre azalan)
+ */
 export const prepareBranchStockData = (data) => {
   if (!data || data.length === 0) return [];
-  return data.map((item) => ({
+
+  // Stok miktarına göre azalan sırala
+  const sorted = [...data].sort((a, b) => (b.stok || 0) - (a.stok || 0));
+
+  return sorted.map((item) => ({
     Şube: item.branch || 'Belirsiz',
     'Stok (Adet)': item.stok || 0,
     'Yüzde (%)': item.percentage || 0
   }));
 };
 
+/**
+ * Düşük stok verilerini düzenler (stok miktarına göre artan - en kritik önce)
+ */
 export const prepareLowStockData = (data) => {
   if (!data || data.length === 0) return [];
-  return data.map((item) => ({
+
+  // Stok miktarına göre artan sırala (en düşük stok önce)
+  const sorted = [...data].sort((a, b) => (a.quantity || 0) - (b.quantity || 0));
+
+  return sorted.map((item) => ({
     'Ürün Adı': item.productId?.name || 'Bilinmeyen',
     Şube: item.branch || 'Belirsiz',
     'Kalan Stok': item.quantity || 0,
